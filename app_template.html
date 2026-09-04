@@ -168,9 +168,9 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
 <header>
   <div class="hdr">
     <div>
-      <div class="eyebrow">Trade Me watchlist &middot; Nelson City Council hazard overlays</div>
+      <div class="eyebrow">realestate.co.nz &middot; Nelson City Council hazard overlays</div>
       <h1>Nelson Shortlist</h1>
-      <div class="src">23 properties &middot; snapshot 4 Sep 2026 &middot; <a href="__SRC__" target="_blank" rel="noopener">open watchlist on Trade Me</a></div>
+      <div class="src"><span id="srcCount"></span> &middot; <a href="__SRC__" target="_blank" rel="noopener">Nelson houses on realestate.co.nz &rarr;</a></div>
     </div>
     <div class="rail" id="rail"></div>
   </div>
@@ -259,13 +259,13 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
     <div>
       <h3>Where the numbers come from</h3>
       <p><b>Hazards</b> are point-in-polygon queries against Nelson City Council's published hazard services — river flood depth (present day and 2130), coastal flood depth, wave run-up, coastal erosion, liquefaction, slope instability tiers, and the fault deformation overlay. Depth bands and probabilities are the council's own wording.</p>
-      <p><b>Decade built, capital value and last sale</b> come from council rating records via homes.co.nz. <b>Beds, baths, floor and land area</b> are as advertised on Trade Me.</p>
+      <p><b>Decade built and capital value</b> come from council rating records via homes.co.nz. <b>Beds, baths, floor and land area, price and description</b> are as advertised on realestate.co.nz.</p>
       <p><b>Distances</b> are straight-line to OpenStreetMap points, not walking or driving time.</p>
     </div>
     <div>
       <h3>What this doesn't tell you</h3>
       <p>A property outside every hazard polygon is outside <em>these</em> polygons. It is not a clean geotech report, and it says nothing about overland flow, stormwater capacity, or what a specific site's ground actually does.</p>
-      <p>Trade Me plots listings to the street address, so a point can sit a few metres off. On a boundary, check the council viewer directly before drawing conclusions.</p>
+      <p>Listings are plotted to the street address, so a point can sit a few metres off. On a boundary, check the council viewer directly before drawing conclusions.</p>
       <p>Coastal and 2130 river layers are climate projections under a stated scenario, not forecasts.</p>
     </div>
     <div>
@@ -485,15 +485,16 @@ var openId=null;
 
 function priceOf(p){ return p.ask || p.cv || 0; }
 function fmt$(n){ return n ? '$'+n.toLocaleString('en-NZ') : '—'; }
+function dec(p){ return p.decade ? p.decade+'s' : '—'; }
 
 /* ---------- listing-description feature scan ----------
-   Each property's `reno` / `dblGlaz` flags come from scanning its Trade Me /
-   agency listing description for the terms below. The descriptions live on
-   third-party sites and can't be embedded here, so the scan is run when the
-   data is built (see build.py); scanText() is the exact matcher that was used
-   and can be re-run over any description string. `featEvidence` holds the
-   short phrase(s) that matched, and `descScanned` is false where no public
-   description could be found to scan. */
+   Each property's `reno` / `dblGlaz` flags come from scanning its realestate.co.nz
+   listing description for the terms below. The descriptions are copyright and live
+   on a third-party site, so the scan is run when the data is crawled (see crawl.py)
+   and only the flags plus a short matched phrase are stored. scanText() is the exact
+   matcher that was used and can be re-run over any description string. `featEvidence`
+   holds the phrase(s) that matched; `descScanned` is false only if a listing had no
+   description to scan. */
 var GLAZ_TERMS = ['double glaz','double-glaz','double glazed'];
 var RENO_TERMS = ['renovat','refurbish','modernis','moderniz','redone','re-done',
                   'fully updated','recently updated','tastefully updated','beautifully updated',
@@ -543,7 +544,7 @@ function sorted(){
 
 function metricFor(p,mode){
   if(mode==='distance'){ var r=refFor(p); return [fmtKm(r.km), r.name.length>22?r.name.slice(0,21)+'…':r.name, fmtWalk(r.km)]; }
-  if(mode==='age-old'||mode==='age-new') return [p.decade+'s','built'];
+  if(mode==='age-old'||mode==='age-new') return [dec(p),'built'];
   if(mode==='price') return [p.ask?fmt$(p.ask):fmt$(p.cv), p.ask?'asking':'capital value'];
   if(mode==='land') return [p.land.toLocaleString()+' m²','land'];
   if(mode==='floor') return [p.floor+' m²','floor'];
@@ -582,7 +583,7 @@ function detailHTML(p){
 
   return '<div class="detail">'
     + '<dl>'
-    + '<div><dt>Decade built</dt><dd>'+p.decade+'s</dd></div>'
+    + '<div><dt>Decade built</dt><dd>'+dec(p)+'</dd></div>'
     + '<div><dt>Construction</dt><dd style="font-size:12.5px">'+(p.constr||'—')+'</dd></div>'
     + '<div><dt>Capital value</dt><dd>'+fmt$(p.cv)+'</dd></div>'
     + '<div><dt>Land value</dt><dd>'+fmt$(p.landValue)+'</dd></div>'
@@ -599,7 +600,7 @@ function detailHTML(p){
     + '<h4 style="font-family:Archivo Narrow,sans-serif;text-transform:uppercase;letter-spacing:.09em;font-size:10px;color:var(--muted);margin:0 0 6px;font-weight:600">Hazard layers intersecting this point</h4>'
     + '<ul class="hz">'+rows+'</ul>'
     + '<div class="nearest"><h4>Nearest of each kind</h4><ul>'+near+'</ul></div>'
-    + '<div class="acts"><a href="'+p.url+'" target="_blank" rel="noopener">Trade Me listing ↗</a>'
+    + '<div class="acts"><a href="'+p.url+'" target="_blank" rel="noopener">View listing ↗</a>'
     + '<a href="https://experience.arcgis.com/experience/188c8d0a60d344ccbd80f8aa71c75184/page/River-Flooding" target="_blank" rel="noopener">Council hazard viewer ↗</a>'
     + '<span style="color:var(--muted);font-family:IBM Plex Mono,monospace;font-size:12px">'+p.lat.toFixed(5)+', '+p.lon.toFixed(5)+'</span></div>'
     + '</div>';
@@ -630,7 +631,7 @@ function render(){
     li.innerHTML='<span class="rank"><input type="checkbox" class="mapchk" '+(hidden[p.id]?'':'checked')+' aria-label="Show this property on the map">'+(i+1)+'</span>'
       +'<span class="addr">'+p.address.replace(/, Nelson$/,'')+'</span>'
       +'<span class="metric"><b>'+m[0]+'</b><span>'+m[1]+'</span>'+(m[2]?'<span class="walk">'+m[2]+'</span>':'')+'</span>'
-      +'<span class="sub"><b>'+p.decade+'s</b><span>'+p.priceText+'</span><b>'+p.beds+'</b><span>bd</span><b>'+p.land+'</b><span>m² land</span></span>'
+      +'<span class="sub"><b>'+dec(p)+'</b><span>'+p.priceText+'</span><b>'+p.beds+'</b><span>bd</span><b>'+p.land+'</b><span>m² land</span></span>'
       +'<span class="chips">'+chips+'</span>'
       +(openId===p.id?detailHTML(p):'');
     li.addEventListener('click',function(e){ if(e.target.closest('a')||e.target.classList.contains('mapchk')) return; select(p.id); });
@@ -674,13 +675,17 @@ function select(id, scroll){
 (function(){
   var flood=P.filter(function(p){return (p.hazards||[]).some(function(h){return h.rank>0&&(h.kind==='flood'||h.kind==='coastal')})}).length;
   var clear=P.filter(function(p){return p.sev==='ok'}).length;
-  var decs=P.map(function(p){return p.decade});
+  var decs=P.map(function(p){return p.decade}).filter(Boolean);
   var med=decs.slice().sort(function(a,b){return a-b})[Math.floor(decs.length/2)];
   var rail=document.getElementById('rail');
   [[P.length,'listings'],[flood,'in a flood zone'],[clear,'nothing flagged'],[med+'s','median build']].forEach(function(s){
     var d=document.createElement('div'); d.className='stat';
     d.innerHTML='<b>'+s[0]+'</b><span>'+s[1]+'</span>'; rail.appendChild(d);
   });
+  var c=DATA.criteria||{};
+  var crit=c.beds_min?(' · '+c.beds_min+'+ bed, '+c.floor_min+'m² floor, '+c.land_min+'m² land'):'';
+  var el=document.getElementById('srcCount');
+  if(el) el.textContent=P.length+' houses · updated '+(DATA.generated||'')+crit;
 })();
 
 /* ---------- more filters ---------- */

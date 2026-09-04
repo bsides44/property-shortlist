@@ -1,14 +1,17 @@
-# Nelson Shortlist — property watchlist hazard tool
+# Nelson Shortlist — property hazard tool
 
-A prototype that takes a Trade Me property watchlist and answers four questions about
-every listing in it: where is it, is it in a hazard zone, how old is it, and how far is
-it from the things you care about.
+A self-updating map of **Nelson houses for sale** that answers four questions about
+every listing: where is it, is it in a hazard zone (flood / slope / liquefaction),
+how old / renovated is it, and how far is it from the things you care about.
 
-Built against one real watchlist (the "Nelson" collection, 23 listings, snapshot
-4 September 2026).
+It tracks realestate.co.nz on its own. A daily [GitHub Action](.github/workflows/update.yml)
+crawls the current Nelson listings that meet a hard filter (3+ bed, 120 m²+ floor,
+250 m²+ land), enriches each with council hazard data, homes.co.nz age/valuation and a
+double-glazing / renovation scan of the listing text, rebuilds the page and commits it.
+New qualifying houses appear automatically; sold ones drop off.
 
-Open `nelson_shortlist.html` in any browser. It is fully self-contained — all data and
-map geometry are embedded, no server and no network needed.
+Open `nelson_shortlist.html` (or the GitHub Pages `index.html`) in any browser. It is
+fully self-contained — all data and map geometry are embedded, no server needed at view time.
 
 ---
 
@@ -16,47 +19,83 @@ map geometry are embedded, no server and no network needed.
 
 | File | What it is |
 |---|---|
-| `nelson_shortlist.html` | The built app. This is the deliverable. |
+| `crawl.py` | **The engine.** Discovers Nelson listings via realestate.co.nz's search API and enriches each (hazards + homes.co.nz + description scan) into `data.json`. |
+| `build_html.py` | Injects `data.json` + `geo.json` into the template → `nelson_shortlist.html` + `index.html`. |
+| `.github/workflows/update.yml` | Daily cron that runs the two scripts and commits the result. |
 | `app_template.html` | App source. Contains `__DATA__`, `__GEO__` and `__SRC__` placeholders. |
-| `build.py` | Merges the raw captures into `data.json`. |
-| `data.json` | Merged properties + POIs, injected into the template. |
+| `nelson_shortlist.html` / `index.html` | The built, self-contained app (identical; `index.html` is for Pages). |
+| `data.json` | Live properties + POIs. Rewritten by `crawl.py` each run. |
 | `geo.json` | Coastline / river / arterial geometry for the map, delta-encoded. |
-| `listings_raw.txt` | Trade Me watchlist cards: address, price, beds, baths, areas, listing date. |
-| `homes_raw.txt` | homes.co.nz records: decade built, construction, council valuations, last sale, coordinates. |
-| `hazards_raw.txt` | Nelson City Council hazard layer hits, one line per property. |
-| `poi_raw.txt` | OpenStreetMap schools, cafés, supermarkets, kindergartens. |
-| `coords.txt` | Coordinates scraped from Trade Me listing pages (superseded by `homes_raw.txt`). |
+| `poi_raw.txt` | OpenStreetMap schools, cafés, supermarkets (POIs are static; not re-crawled). |
+| `build.py` | **Legacy** one-off merger for the original 23-listing Trade Me snapshot. Superseded by `crawl.py`; kept for reference. |
+| `*_raw.txt`, `coords.txt` | Original one-off captures behind `build.py`. Historical. |
 
-Rebuild after editing any raw file:
+Run the pipeline locally:
 
 ```bash
-python3 build.py                 # writes data.json
-# then re-inject into the template (see "Rebuilding" below)
+python3 crawl.py           # update data.json from realestate.co.nz (respects CRAWL_MAX_NEW)
+python3 build_html.py      # rebuild nelson_shortlist.html + index.html
 ```
+
+---
+
+## Automated updates (GitHub Actions)
+
+`.github/workflows/update.yml` runs once a day (`0 18 * * *`, ≈ 6am NZ) plus a manual
+**Run workflow** button. Each run: `crawl.py` → `build_html.py` → commit `data.json` +
+`index.html` if anything changed. It needs no secrets — `GITHUB_TOKEN` (granted
+`contents: write` in the workflow) does the commit.
+
+- **Free tier.** One ~5–15 min job a day. Public repos: Actions minutes are unmetered.
+  Private repos: 2,000 min/month free, so this uses roughly a quarter of it at most.
+- **Politeness.** Discovery is 2–3 API calls. Only *new* listings are enriched, capped at
+  `CRAWL_MAX_NEW` (40) per run — so a first run backfills 40 and the rest arrive over the
+  next few days, then it's just whatever came on the market. Hazard queries run against
+  the public council Esri service; homes.co.nz calls are spaced out.
+- **First run.** `data.json` was seeded locally with the full backfill, so day one is
+  already complete; the Action just maintains it.
+
+### Publishing the page
+
+To view the always-current page, turn on **GitHub Pages** (Settings → Pages → deploy from
+branch, root) and open the `index.html` URL — the daily commit republishes it. If you'd
+rather not host it, just `git pull` and open `nelson_shortlist.html` locally.
+
+### Tuning
+
+The filter and cadence live at the top of `crawl.py` (`MIN_BEDS`, `MIN_FLOOR`, `MIN_LAND`,
+`RE_DISTRICT`, `MAX_NEW_PER_RUN`) and in the workflow's `cron`. A manual "add this one
+listing" path isn't wired up, but a listing outside the filter can be included by loosening
+these constants.
 
 ---
 
 ## Where the data comes from
 
-### 1. The watchlist — the fragile part
+### 1. The listings — realestate.co.nz search API
 
-A shared watchlist link is a JWT-authenticated page on `trademe.co.nz`. It cannot be
-fetched server-side: Trade Me is a client-rendered Angular app with bot detection that
-returns **HTTP 406** to automated requests. The token also expires after about 7 days.
+Discovery uses realestate.co.nz's own (unauthenticated) search API — the JSON that its
+site hydrates from — so there is no HTML scraping and nothing brittle to break:
 
-What worked: opening the share link in a logged-in browser session, which redirects to
-`/a/my-trade-me/watchlist/<uuid>` — the `uuid` is the `sub` claim in the JWT. Listing IDs
-come from `a[href*="/a/listing/"]` on that page.
+```
+GET https://platform.realestate.co.nz/search/v1/listings
+    ?filter[category][]=res_sale         # residential, for sale
+    &filter[district][]=271              # Nelson  (Tasman is a different id)
+    &filter[propertyType][]=1            # house
+    &page[limit]=100&page[offset]=0      # meta.totalResults drives paging
+```
 
-**Go gently.** Loading listing pages in a rapid loop of hidden iframes got this browser
-profile blocked within a few minutes. One page every 15–20 seconds is the sustainable rate.
+Each `data[]` item's `attributes` already carry everything we filter and display —
+`bedroom-count`, `floor-area`, `land-area`, `price-display`, `published-date`,
+`description`, and `address.latitude/longitude`. The hard filter (3+ bed, 120 m²+ floor,
+250 m²+ land) is applied in `crawl.py`; the coordinates feed the hazard queries directly,
+so homes.co.nz's fuzzy address search never has to guess which house we mean.
 
-Alternatives, if you want something less brittle:
-
-- **Trade Me's official API** — `GET /v1/mytrademe/watchlist/{filter}.json`, OAuth, needs a
-  developer key. Sanctioned and stable, but returns the whole watchlist as one list with no
-  named collections, so "Nelson" and "Porirua" arrive indistinguishable.
-- **Paste listing IDs manually.** Nothing to break.
+Notes for anyone extending it:
+- District ids: Nelson = **271**. Trade Me is deliberately *not* used — its watchlist is
+  login-gated, bot-detected (HTTP 406 to scripts) and its token expires ~weekly.
+- The public site's HTML is served in inconsistent variants (sometimes SSR anchors,
+  sometimes a hydration blob), which is exactly why the API is the stable source.
 
 ### 2. Property records — homes.co.nz
 
