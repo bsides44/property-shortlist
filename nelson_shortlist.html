@@ -1,0 +1,731 @@
+<title>Nelson Shortlist Hazard Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;600;700&family=Public+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#e9ede9; --surface:#ffffff; --surface-2:#f4f6f3; --line:#ccd5cf; --line-soft:#dee5e0;
+  --ink:#111d1b; --ink-2:#3d4d49; --muted:#677873;
+  --accent:#0e5c53; --accent-soft:#d6e6e2;
+  --ok:#5f7a46; --ok-bg:#e4ebda;
+  --watch:#a8761c; --watch-bg:#f5e9d2;
+  --high:#9c4426; --high-bg:#f3ddd4;
+  --future:#4f1d0f; --future-bg:#d3ab9e;
+  --none:#8b9a95;
+  --water:#b8ccd2; --road:#c9cfc9;
+  --shadow:0 1px 2px rgba(17,29,27,.06),0 6px 18px rgba(17,29,27,.05);
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0c1211; --surface:#141c1a; --surface-2:#1b2422; --line:#2c3936; --line-soft:#222e2c;
+    --ink:#e6ede9; --ink-2:#b3c1bc; --muted:#859892;
+    --accent:#5cb9a9; --accent-soft:#1d3532;
+    --ok:#9dbb7e; --ok-bg:#1e2a1b;
+    --watch:#e0a94c; --watch-bg:#332818;
+    --high:#e08663; --high-bg:#341f18;
+    --future:#f0a081; --future-bg:#4d2417;
+    --none:#6b7a76;
+    --water:#2b4650; --road:#333d38;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0c1211; --surface:#141c1a; --surface-2:#1b2422; --line:#2c3936; --line-soft:#222e2c;
+  --ink:#e6ede9; --ink-2:#b3c1bc; --muted:#859892;
+  --accent:#5cb9a9; --accent-soft:#1d3532;
+  --ok:#9dbb7e; --ok-bg:#1e2a1b;
+  --watch:#e0a94c; --watch-bg:#332818;
+  --high:#e08663; --high-bg:#341f18;
+  --future:#f0a081; --future-bg:#4d2417;
+  --none:#6b7a76;
+  --water:#2b4650; --road:#333d38;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--ground);color:var(--ink);
+  font-family:"Public Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1280px;margin:0 auto;padding:0 20px 64px}
+
+/* ---------- header ---------- */
+header{border-bottom:1px solid var(--line);background:var(--surface);}
+.hdr{max-width:1280px;margin:0 auto;padding:20px;display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end;justify-content:space-between}
+.eyebrow{font-family:"Archivo Narrow",sans-serif;font-weight:600;text-transform:uppercase;letter-spacing:.13em;font-size:11px;color:var(--muted)}
+h1{font-family:"Archivo Narrow",sans-serif;font-weight:700;font-size:clamp(26px,3.4vw,38px);line-height:1.05;margin:4px 0 0;letter-spacing:-.005em;text-wrap:balance}
+.src{font-size:12.5px;color:var(--muted);margin-top:6px}
+.src a{color:var(--accent)}
+.rail{display:flex;gap:26px;flex-wrap:wrap}
+.stat{min-width:64px}
+.stat b{display:block;font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:23px;line-height:1.1;font-variant-numeric:tabular-nums}
+.stat span{font-family:"Archivo Narrow",sans-serif;text-transform:uppercase;letter-spacing:.1em;font-size:10.5px;color:var(--muted)}
+
+/* ---------- controls ---------- */
+.controls{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:flex-end;padding:18px 0 20px;border-bottom:1px solid var(--line-soft);margin-bottom:22px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field > label{font-family:"Archivo Narrow",sans-serif;text-transform:uppercase;letter-spacing:.1em;font-size:10.5px;color:var(--muted)}
+select,button.ghost{
+  font-family:"Public Sans",sans-serif;font-size:14px;color:var(--ink);
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:7px 10px;
+}
+select{min-width:190px}
+select:focus-visible,button:focus-visible,.row:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.toggles{display:flex;gap:8px;flex-wrap:wrap}
+.chk{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:7px 11px;cursor:pointer;user-select:none}
+.chk input{accent-color:var(--accent);margin:0}
+[hidden]{display:none!important}
+button.ghost{cursor:pointer;font-size:13.5px}
+button.ghost[aria-expanded="true"]{border-color:var(--accent);color:var(--accent)}
+.morewrap{flex-basis:100%}
+.morepanel{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px 22px;padding:16px;background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--r)}
+.morepanel .field{gap:7px}
+.slabel{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-family:"Archivo Narrow",sans-serif;text-transform:uppercase;letter-spacing:.1em;font-size:10.5px;color:var(--muted)}
+.slabel b{font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:12.5px;color:var(--ink-2);text-transform:none;letter-spacing:0}
+.morepanel input[type=range]{width:100%;accent-color:var(--accent);margin:0}
+
+/* ---------- layout ---------- */
+.grid{display:grid;grid-template-columns:minmax(0,440px) minmax(0,1fr);gap:26px;align-items:start}
+@media (max-width:960px){.grid{grid-template-columns:1fr}}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.mapwrap{position:sticky;top:18px}
+.maphead{display:flex;justify-content:space-between;align-items:baseline;padding:13px 15px 9px}
+.maphead h2{font-family:"Archivo Narrow",sans-serif;text-transform:uppercase;letter-spacing:.11em;font-size:12px;margin:0;color:var(--ink-2)}
+.maphead .scale{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted)}
+svg.map{display:block;width:100%;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:9px 16px;padding:11px 15px 14px;border-top:1px solid var(--line-soft);font-size:12.5px;color:var(--ink-2)}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:1px}
+
+/* ---------- list ---------- */
+.listhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+.listhead h2{font-family:"Archivo Narrow",sans-serif;text-transform:uppercase;letter-spacing:.11em;font-size:12px;margin:0;color:var(--ink-2)}
+.listhead .count{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--muted)}
+ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
+.row{
+  display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:0 14px;align-items:baseline;
+  background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--sev,var(--none));
+  border-radius:var(--r);padding:11px 14px;cursor:pointer;
+}
+.row:hover{border-color:var(--accent);background:var(--surface-2)}
+.row[aria-expanded="true"]{border-color:var(--accent);background:var(--surface-2)}
+.rank{display:flex;flex-direction:column;align-items:center;gap:5px;font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.rank input{accent-color:var(--accent);margin:0;cursor:pointer}
+.row.mapoff{opacity:.5}
+.row.mapoff .addr{text-decoration:line-through;text-decoration-color:var(--line)}
+.addr{font-weight:600;font-size:15px;line-height:1.3}
+.sub{grid-column:2;font-size:13px;color:var(--muted);margin-top:2px;display:flex;flex-wrap:wrap;gap:4px 12px}
+.sub b{font-family:"IBM Plex Mono",monospace;font-weight:500;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.metric{grid-row:1/3;grid-column:3;text-align:right;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;align-self:center}
+.metric b{display:block;font-size:17px;font-weight:500;line-height:1.15}
+.metric span{font-size:10.5px;color:var(--muted);font-family:"Archivo Narrow",sans-serif;text-transform:uppercase;letter-spacing:.09em}
+.metric .walk{display:block;margin-top:2px;text-transform:none;letter-spacing:0;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted)}
+.chips{grid-column:2;display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.chip{font-size:11.5px;font-weight:500;padding:2px 7px;border-radius:3px;white-space:nowrap}
+.chip.ok{background:var(--ok-bg);color:var(--ok)}
+.chip.watch{background:var(--watch-bg);color:var(--watch)}
+.chip.high{background:var(--high-bg);color:var(--high)}
+.chip.future{background:var(--future-bg);color:var(--future)}
+.chip.plain{background:var(--surface-2);color:var(--muted);border:1px solid var(--line-soft)}
+.chip.feat{background:var(--accent-soft);color:var(--accent)}
+
+/* ---------- detail ---------- */
+.detail{grid-column:1/-1;margin-top:12px;padding-top:13px;border-top:1px solid var(--line-soft);cursor:default}
+.detail dl{margin:0 0 14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:11px 16px}
+.detail dt{font-family:"Archivo Narrow",sans-serif;text-transform:uppercase;letter-spacing:.09em;font-size:10px;color:var(--muted)}
+.detail dd{margin:1px 0 0;font-family:"IBM Plex Mono",monospace;font-size:13.5px;font-variant-numeric:tabular-nums}
+.hz{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.hz li{display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:12px;font-size:13px;padding:6px 9px;border-radius:4px;background:var(--surface-2);align-items:baseline}
+.hz .hzname{font-weight:600}
+.hz .hzscn{color:var(--muted);font-size:12.5px}
+.hz .hzval{font-family:"IBM Plex Mono",monospace;font-size:12.5px;text-align:right}
+.hz li.sev-high{background:var(--high-bg)}
+.hz li.sev-future{background:var(--future-bg)}
+.hz li.sev-future .hzname,.hz li.sev-future .hzval{color:var(--future)}
+.hz li.sev-watch{background:var(--watch-bg)}
+.hz li.sev-ok{background:var(--ok-bg)}
+.acts{display:flex;gap:16px;margin-top:13px;font-size:13.5px}
+.acts a{color:var(--accent);font-weight:500}
+.nearest{margin-top:12px;font-size:13px;color:var(--ink-2)}
+.nearest h4{font-family:"Archivo Narrow",sans-serif;text-transform:uppercase;letter-spacing:.09em;font-size:10px;color:var(--muted);margin:0 0 5px;font-weight:600}
+.nearest ul{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:3px 16px}
+.nearest li{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dotted var(--line-soft);padding:2px 0}
+.nearest em{font-style:normal;font-family:"IBM Plex Mono",monospace;color:var(--muted)}
+
+/* ---------- notes ---------- */
+.notes{margin-top:34px;border-top:1px solid var(--line);padding-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:22px}
+.notes h3{font-family:"Archivo Narrow",sans-serif;text-transform:uppercase;letter-spacing:.11em;font-size:11px;color:var(--muted);margin:0 0 7px}
+.notes p{margin:0 0 9px;font-size:13.5px;color:var(--ink-2);max-width:60ch}
+.notes a{color:var(--accent)}
+.notes code{font-family:"IBM Plex Mono",monospace;font-size:12px;background:var(--surface-2);padding:1px 4px;border-radius:3px}
+.flag{background:var(--watch-bg);color:var(--watch);border-radius:var(--r);padding:10px 13px;font-size:13px;margin-bottom:18px}
+@media (prefers-reduced-motion:no-preference){
+  .dot{transition:r .15s ease, stroke-width .15s ease}
+}
+</style>
+
+<header>
+  <div class="hdr">
+    <div>
+      <div class="eyebrow">Trade Me watchlist &middot; Nelson City Council hazard overlays</div>
+      <h1>Nelson Shortlist</h1>
+      <div class="src">23 properties &middot; snapshot 4 Sep 2026 &middot; <a href="https://www.trademe.co.nz/a/my-trade-me/watchlist/6c84172e-ec87-4420-8852-a7ce3d7ff433" target="_blank" rel="noopener">open watchlist on Trade Me</a></div>
+    </div>
+    <div class="rail" id="rail"></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="controls">
+    <div class="field">
+      <label for="rank">Rank by</label>
+      <select id="rank">
+        <option value="hazard">Hazard exposure (least first)</option>
+        <option value="age-old">Age — oldest first</option>
+        <option value="age-new">Age — newest first</option>
+        <option value="distance">Distance to</option>
+        <option value="price">Asking price / CV</option>
+        <option value="land">Land area</option>
+        <option value="floor">Floor area</option>
+      </select>
+    </div>
+    <div class="field" id="refField" hidden>
+      <label for="ref">Distance to</label>
+      <select id="ref"></select>
+    </div>
+    <div class="field">
+      <label for="filter">Show</label>
+      <div class="toggles">
+        <label class="chk"><input type="checkbox" id="fFlood"> No flood exposure</label>
+        <label class="chk"><input type="checkbox" id="fSlope"> No slope / liquefaction flag</label>
+        <label class="chk"><input type="checkbox" id="fReno"> Double glazing / renovated</label>
+        <button type="button" class="ghost" id="moreBtn" aria-expanded="false" aria-controls="morePanel">More filters</button>
+      </div>
+    </div>
+    <div class="morewrap" id="morePanel" hidden>
+      <div class="morepanel">
+        <div class="field">
+          <label class="slabel" for="fBuilt">Built after <b id="vBuilt"></b></label>
+          <input type="range" id="fBuilt">
+        </div>
+        <div class="field">
+          <label class="slabel" for="fPrice">Under asking price / CV <b id="vPrice"></b></label>
+          <input type="range" id="fPrice">
+        </div>
+        <div class="field">
+          <label class="slabel" for="fLand">Min land area <b id="vLand"></b></label>
+          <input type="range" id="fLand">
+        </div>
+        <div class="field">
+          <label class="slabel" for="fFloor">Min floor area <b id="vFloor"></b></label>
+          <input type="range" id="fFloor">
+        </div>
+        <div class="field">
+          <label class="slabel" for="fBeds">Min bedrooms <b id="vBeds"></b></label>
+          <input type="range" id="fBeds">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="mapwrap">
+      <div class="panel">
+        <div class="maphead">
+          <h2>Where they sit</h2>
+          <span class="scale" id="scalebar"></span>
+        </div>
+        <svg class="map" id="map" viewBox="0 0 460 560" role="img" aria-label="Schematic map of Nelson showing shortlisted properties coloured by hazard exposure"></svg>
+        <div class="legend">
+          <span><i style="background:var(--high)"></i>Flood or multiple flags</span>
+          <span><i style="background:var(--watch)"></i>One flag to check</span>
+          <span><i style="background:var(--ok)"></i>Nothing flagged</span>
+          <span><i style="background:var(--none)"></i>Outside NCC coverage</span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="listhead">
+        <h2 id="listTitle">Ranked</h2>
+        <span class="count" id="count"></span>
+      </div>
+      <ol class="rows" id="rows"></ol>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div>
+      <h3>Where the numbers come from</h3>
+      <p><b>Hazards</b> are point-in-polygon queries against Nelson City Council's published hazard services — river flood depth (present day and 2130), coastal flood depth, wave run-up, coastal erosion, liquefaction, slope instability tiers, and the fault deformation overlay. Depth bands and probabilities are the council's own wording.</p>
+      <p><b>Decade built, capital value and last sale</b> come from council rating records via homes.co.nz. <b>Beds, baths, floor and land area</b> are as advertised on Trade Me.</p>
+      <p><b>Distances</b> are straight-line to OpenStreetMap points, not walking or driving time.</p>
+    </div>
+    <div>
+      <h3>What this doesn't tell you</h3>
+      <p>A property outside every hazard polygon is outside <em>these</em> polygons. It is not a clean geotech report, and it says nothing about overland flow, stormwater capacity, or what a specific site's ground actually does.</p>
+      <p>Trade Me plots listings to the street address, so a point can sit a few metres off. On a boundary, check the council viewer directly before drawing conclusions.</p>
+      <p>Coastal and 2130 river layers are climate projections under a stated scenario, not forecasts.</p>
+    </div>
+    <div>
+      <h3>Adding another region</h3>
+      <p>Coverage here stops at the Nelson City Council boundary. Each council publishes its own hazard services, so a new region means pointing the same query at a new endpoint and mapping its layer names into the same severity scale.</p>
+      <p>For your Wellington lists that means Greater Wellington Regional Council plus the relevant city council; for Richmond and Best Island, Tasman District Council.</p>
+      <p class="src" style="margin-top:10px"><a href="https://experience.arcgis.com/experience/188c8d0a60d344ccbd80f8aa71c75184/page/River-Flooding" target="_blank" rel="noopener">Nelson City Council natural hazard maps &rarr;</a></p>
+    </div>
+  </div>
+</div>
+
+<script id="data" type="application/json">{"collection": "Nelson", "sourceUrl": "https://www.trademe.co.nz/a/my-trade-me/watchlist/6c84172e-ec87-4420-8852-a7ce3d7ff433", "generated": "2026-09-04", "properties": [{"id": "6101420908", "address": "1/20 Van Diemen Street, Nelson, Nelson", "listed": "26 Aug", "priceText": "Deadline sale, 16 Sept", "ask": null, "beds": 3, "baths": 1, "parking": 1, "floor": 114, "land": 610, "url": "https://www.trademe.co.nz/a/listing/6101420908", "decade": 1960, "constr": "Concrete, tile roof", "cv": 630000, "landValue": 485000, "improvValue": 145000, "lastSale": 288500, "lastSaleDate": "2015-01-21", "lat": -41.283470153808594, "lon": 173.28004455566406, "hazards": [{"key": "liqA", "name": "Liquefaction", "scenario": "Regional assessment (Level A)", "kind": "ground", "detail": "Very Low Liquefaction Vulnerability", "depth": null, "rank": 0}], "outsideCoverage": false, "hazardScore": 0, "hazardCount": 0, "descScanned": false, "reno": false, "dblGlaz": false, "featEvidence": ""}, {"id": "5906761703", "address": "10E Village Lane, Stoke, Nelson", "listed": "28 Apr", "priceText": "Enquiries over $829,000", "ask": 829000, "beds": 4, "baths": 2, "parking": 2, "floor": 174, "land": 817, "url": "https://www.trademe.co.nz/a/listing/5906761703", "decade": 2010, "constr": "Mixed materials, iron roof", "cv": 790000, "landValue": 420000, "improvValue": 370000, "lastSale": 850000, "lastSaleDate": "2021-08-31", "lat": -41.32817840576172, "lon": 173.24046325683594, "hazards": [{"key": "liqA", "name": "Liquefaction", "scenario": "Regional assessment (Level A)", "kind": "ground", "detail": "Very Low Liquefaction Vulnerability", "depth": null, "rank": 0}, {"key": "slopeIII", "name": "Slope instability", "scenario": "Tier III", "kind": "slope", "detail": "Tier III", "depth": null, "rank": 2}], "outsideCoverage": false, "hazardScore": 2, "hazardCount": 1, "descScanned": true, "reno": false, "dblGlaz": false, "featEvidence": ""}, {"id": "5750958235", "address": "129 Cleveland Terrace, Maitai, Nelson", "listed": "26 Jan", "priceText": "Price by negotiation", "ask": null, "beds": 3, "baths": 1, "parking": 2, "floor": 100, "land": 469, "url": "https://www.trademe.co.nz/a/listing/5750958235", "decade": 1990, "constr": "Wood, iron roof", "cv": 740000, "landValue": 430000, "improvValue": 310000, "lastSale": 405000, "lastSaleDate": "2014-03-24", "lat": -41.2778205871582, "lon": 173.30093383789062, "hazards": [{"key": "liqA", "name": "Liquefaction", "scenario": "Regional assessment (Level A)", "kind": "ground", "detail": "Very Low Liquefaction Vulnerability", "depth": null, "rank": 0}, {"key": "slopeIII", "name": "Slope instability", "scenario": "Tier III", "kind": "slope", "detail": "Tier III", "depth": null, "rank": 2}], "outsideCoverage": false, "hazardScore": 2, "hazardCount": 1, "descScanned": true, "reno": true, "dblGlaz": false, "featEvidence": "thoughtfully renovated"}, {"id": "5782013688", "address": "139 Barnett Avenue, Best Island, Tasman", "listed": "13 Feb", "priceText": "Enquiries over $799,000", "ask": 799000, "beds": 4, "baths": 2, "parking": 0, "floor": 110, "land": 809, "url": "https://www.trademe.co.nz/a/listing/5782013688", "decade": 1950, "constr": "Mixed materials, iron roof", "cv": 840000, "landValue": 405000, "improvValue": 435000, "lastSale": 540000, "lastSaleDate": "2015-09-03", "lat": -41.3001708984375, "lon": 173.16383361816406, "hazards": [], "outsideCoverage": true, "hazardScore": 0, "hazardCount": 0, "descScanned": true, "reno": false, "dblGlaz": false, "featEvidence": ""}, {"id": "6079187008", "address": "15 Washington Road, Washington Valley, Nelson", "listed": "12 Aug", "priceText": "Enquiries over $649,000", "ask": 649000, "beds": 3, "baths": 1, "parking": 6, "floor": 160, "land": 774, "url": "https://www.trademe.co.nz/a/listing/6079187008", "decade": 1960, "constr": "Wood, iron roof", "cv": 620000, "landValue": 385000, "improvValue": 235000, "lastSale": null, "lastSaleDate": "2014-09-04", "lat": -41.27334976196289, "lon": 173.2748565673828, "hazards": [{"key": "liqA", "name": "Liquefaction", "scenario": "Regional assessment (Level A)", "kind": "ground", "detail": "Very Low Liquefaction Vulnerability", "depth": null, "rank": 0}], "outsideCoverage": false, "hazardScore": 0, "hazardCount": 0, "descScanned": true, "reno": false, "dblGlaz": false, "featEvidence": ""}, {"id": "6114065395", "address": "16 Gorrie Street, Nelson South, Nelson", "listed": "3 Sep", "priceText": "To be auctioned, 23 Sept", "ask": null, "beds": 4, "baths": 2, "parking": 6, "floor": 150, "land": 620, "url": "https://www.trademe.co.nz/a/listing/6114065395", "decade": 1940, "constr": "Mixed materials, flat roof", "cv": 630000, "landValue": 385000, "improvValue": 245000, "lastSale": 495000, "lastSaleDate": "2019-04-30", "lat": -41.28224563598633, "lon": 173.26992797851562, "hazards": [{"key": "river2020", "name": "River flooding", "scenario": "Present day, 1% AEP", "kind": "flood", "detail": ">20 - 50cm", "depth": ">20 - 50cm", "rank": 2}, {"key": "river2130", "name": "River flooding", "scenario": "2130 projection", "kind": "flood", "detail": ">20 - 50cm", "depth": ">20 - 50cm", "rank": 2}, {"key": "liqA", "name": "Liquefaction", "scenario": "Regional assessment (Level A)", "kind": "ground", "detail": "Liquefaction Damage is Unlikely", "depth": null, "rank": 0}], "outsideCoverage": false, "hazardScore": 4, "hazardCount": 2, "descScanned": false, "reno": false, "dblGlaz": false, "featEvidence": ""}, {"id": "5532971914", "address": "200 Collingwood Street, Nelson, Nelson", "listed": "19 Sep", "priceText": "Asking price: $1,529,000", "ask": 1529000, "beds": 6, "baths": 3, "parking": 2, "floor": 298, "land": 692, "url": "https://www.trademe.co.nz/a/listing/5532971914", "decade": 1930, "constr": "Wood, iron roof", "cv": 1720000, "landValue": 820000, "improvValue": 900000, "lastSale": 885000, "lastSaleDate": "2018-07-11", "lat": -41.27918243408203, "lon": 173.28614807128906, "hazards": [{"key": "liqA", "name": "Liquefaction", "scenario": "Regional assessment (Level A)", "kind": "ground", "detail": "Liquefaction Damage is Unlikely", "depth": null, "rank": 0}], "outsideCoverage": false, "hazardScore": 0, "hazardCount": 0, "descScanned": true, "reno": true, "dblGlaz": false, "featEvidence": "extensively renovated"}, {"id": "6010957811", "address": "221 Nile Street, Maitai, Nelson", "listed": "30 Jun", "priceText": "Enquiries over $789,000", "ask": 789000, "beds": 4, "baths": 2, "parking": 4, "floor": 185, "land": 607, "url": "https://www.trademe.co.nz/a/listing/6010957811", "decade": 1960, "constr": "Wood, tile roof", "cv": 790000, "landValue": 415000, "improvValue": 375000, "lastSale": 760000, "lastSaleDate": "2023-06-14", "lat": -41.27641677856445, "lon": 173.30087280273438, "hazards": [{"key": "river2020", "name": "River flooding", "scenario": "Present day, 1% AEP", "kind": "flood", "detail": ">1 - 2m", "depth": ">1 - 2m", "rank": 4}, {"key": "river2130", "name": "River flooding", "scenario": "2130 projection", "kind": "flood", "detail": ">1 - 2m", "depth": ">1 - 2m", "rank": 4}, {"key": "liqA", "name": "Liquefaction", "scenario": "Regional assessment (Level A)", "kind": "ground", "detail": "Liquefaction Damage is Possible", "depth": null, "rank": 2}], "outsideCoverage": false, "hazardScore": 10, "hazardCount": 3, "descScanned": true, "reno": true, "dblGlaz": false, "featEvidence": "new bathroom and kitchen"}, {"id": "5766783417", "address": "25 Clovelly Street, Atawhai, Nelson", "listed": "4 Feb", "priceText": "Enquiries over $789,000", "ask": 789000, "beds": 5, "baths": 2, "parking": 4, "floor": 180, "land": 404, "url": "https://www.trademe.co.nz/a/listing/5766783417", "decade": 1990, "constr": "Roughcast, iron roof", "cv": 760000, "landValue": 295000, "improvValue": 465000, "lastSale": 205500, "lastSaleDate": "1997-01-14", "lat": -41.238773345947266, "lon": 173.32203674316406, "hazards": [{"key": "liqA", "name": "Liquefaction", "scenario": "Regional assessment (Level A)", "kind": "ground", "detail": "Liquefaction Damage is Unlikely", "depth": null, "rank": 0}], "outsideCoverage": false, "hazardScore": 0, "hazardCount": 0, "descScanned": true, "reno": true, "dblGlaz": false, "featEvidence": "beautifully renovated family bathroom"}, {"id": "6104541481", "address": "3 Piwakawaka Drive, Stoke, Nelson", "listed": "28 Aug", "priceText": "Enquiries over $909,000", "ask": 909000, "beds": 4, "baths": 2, "parking": 4, "floor": 171, "land": 520, "url": "https://www.trademe.co.nz/a/listing/6104541481", "decade": 2010, "constr": "Roughcast, iron roof", "cv": 860000, "landValue": 355000, "improvValue": 505000, "lastSale": 852500, "lastSaleDate": "2020-03-24", "lat": -41.32390213012695, "lon": 173.230224609375, "hazards": [{"key": "liqA", "name": "Liquefaction", "scenario": "Regional assessment (Level A)", "kind": "ground", "detail": "Liquefaction Damage is Unlikely", "depth": null, "rank": 0}], "outsideCoverage": false, "hazardScore": 0, "hazardCount": 0, "descScanned": true, "reno": false, "dblGlaz": false, "featEvidence": ""}, {"id": "5930848760", "address": "32 Brunner Street, Nelson South, Nelson", "listed": "12 May", "priceText": "Price by negotiation", "ask": null, "beds": 4, "baths": 2, "parking": 0, "floor": 120, "land": 625, "url": "https://www.trademe.co.nz/a/listing/5930848760", "decade": 1940, "constr": "Wood, tile roof", "cv": 720000, "landValue": 350000, "improvValue": 370000, "lastSale": 312000, "lastSaleDate": "2013-02-14", "lat": -41.2942008972168, "lon": 173.2706756591797, "hazards": [{"key": "liqA", "name": "Liquefaction", "scenario": "Regional assessment (Level A)", "kind": "ground", "detail": "Very Low Liquefaction Vulnerability", "depth": null, "rank": 0}, {"key": "slopeII", "name": "Slope instability", "scenario": "Tier II", "kind": "slope", "detail": "Tier II", "depth": null, "rank": 3}], "outsideCoverage": false, "hazardScore": 3, "hazardCount": 1, "descScanned": false, "reno": false, "dblGlaz": false, "featEvidence": ""}, {"id": "5969731326", "address": "35 Konini Street, Nelson South, Nelson", "listed": "4 Jun", "priceText": "Enquiries over $669,000", "ask": 669000, "beds": 3, "baths": 1, "parking": 4, "floor": 150, "land": 595, "url": "https://www.trademe.co.nz/a/listing/5969731326", "decade": 1990, "constr": "Fibre cement, tile roof", "cv": 630000, "landValue": 305000, "improvValue": 325000, "lastSale": 570500, "lastSaleDate": "2020-01-22", "lat": -41.27922439575195, "lon": 173.27528381347656, "hazards": [{"key": "liqA", "name": "Liquefaction", "scenario": "Regional assessment (Level A)", "kind": "ground", "detail": "Very Low Liquefaction Vulnerability", "depth": null, "rank": 0}, {"key": "slopeIII", "name": "Slope instability", "scenario": "Tier III", "kind": "slope", "detail": "Tier III", "depth": null, "rank": 2}], "outsideCoverage": false, "hazardScore": 2, "hazardCount": 1, "descScanned": true, "reno": true, "dblGlaz": false, "featEvidence": "modernised kitchen"}, {"id": "5920402562", "address": "38 Mount Street, Nelson South, Nelson", "listed": "6 May", "priceText": "Enquiries over $929,000", "ask": 929000, "beds": 4, "baths": 2, "parking": 2, "floor": 197, "land": 688, "url": "https://www.trademe.co.nz/a/listing/5920402562", "decade": 1890, "constr": "Wood, iron roof", "cv": 980000, "landValue": 595000, "improvValue": 385000, "lastSale": 215000, "lastSaleDate": "1995-03-20", "lat": -41.27825927734375, "lon": 173.2775115966797, "hazards": [{"key": "liqA", "name": "Liquefaction", "scenario": "Regional assessment (Level A)", "kind": "ground", "detail": "Very Low Liquefaction Vulnerability", "depth": null, "rank": 0}], "outsideCoverage": false, "hazardScore": 0, "hazardCount": 0, "descScanned": true, "reno": false, "dblGlaz": false, "featEvidence": ""}, {"id": "6077521522", "address": "384A Hardy Street East, Nelson, Nelson", "listed": "11 Aug", "priceText": "Enquiries over $930,000", "ask": 930000, "beds": 4, "baths": 2, "parking": 2, "floor": 140, "land": 609, "url": "https://www.trademe.co.nz/a/listing/6077521522", "decade": 1980, "constr": "Wood, iron roof", "cv": 960000, "landValue": 640000, "improvValue": 320000, "lastSale": null, "lastSaleDate": "1999-09-24", "lat": -41.275047302246094, "lon": 173.29473876953125, "hazards": [{"key": "liqA", "name": "Liquefaction", "scenario": "Regional assessment (Level A)", "kind": "ground", "detail": "Liquefaction Damage is Possible", "depth": null, "rank": 2}], "outsideCoverage": false, "hazardScore": 2, "hazardCount": 1, "descScanned": false, "reno": false, "dblGlaz": false, "featEvidence": ""}, {"id": "6012638172", "address": "4 Persico Way, The Wood, Nelson", "listed": "1 Jul", "priceText": "Enquiries over $950,000", "ask": 950000, "beds": 3, "baths": 2, "parking": 3, "floor": 165, "land": 400, "url": "https://www.trademe.co.nz/a/listing/6012638172", "decade": 2000, "constr": "Brick, tile roof", "cv": 1000000, "landValue": 580000, "improvValue": 420000, "lastSale": 676100, "lastSaleDate": "2016-09-15", "lat": -41.2679328918457, "lon": 173.29376220703125, "hazards": [{"key": "river2130", "name": "River flooding", "scenario": "2130 projection", "kind": "flood", "detail": ">5 - 20cm", "depth": ">5 - 20cm", "rank": 1}, {"key": "coast2130", "name": "Coastal flooding", "scenario": "2130, SSP5-8.5M", "kind": "coastal", "detail": ">20 - 50cm", "depth": ">20 - 50cm", "rank": 2}, {"key": "liqA", "name": "Liquefaction", "scenario": "Regional assessment (Level A)", "kind": "ground", "detail": "Liquefaction Damage is Possible", "depth": null, "rank": 2}], "outsideCoverage": false, "hazardScore": 5, "hazardCount": 3, "descScanned": false, "reno": false, "dblGlaz": false, "featEvidence": ""}, {"id": "5788310112", "address": "45 Alton Street, Nelson, Nelson", "listed": "17 Feb", "priceText": "Asking price: $925,000", "ask": 925000, "beds": 3, "baths": 1, "parking": null, "floor": 114, "land": 379, "url": "https://www.trademe.co.nz/a/listing/5788310112", "decade": 1920, "constr": "Wood, iron roof", "cv": 1010000, "landValue": 710000, "improvValue": 300000, "lastSale": 519000, "lastSaleDate": "2015-09-15", "lat": -41.277870178222656, "lon": 173.28990173339844, "hazards": [{"key": "liqA", "name": "Liquefaction", "scenario": "Regional assessment (Level A)", "kind": "ground", "detail": "Liquefaction Damage is Possible", "depth": null, "rank": 2}], "outsideCoverage": false, "hazardScore": 2, "hazardCount": 1, "descScanned": true, "reno": true, "dblGlaz": false, "featEvidence": "thoughtfully modernised"}, {"id": "5959828752", "address": "48 Douglas Road, Wakatu, Nelson", "listed": "29 May", "priceText": "Enquiries over $750,000", "ask": 750000, "beds": 3, "baths": 1, "parking": 1, "floor": 170, "land": 759, "url": "https://www.trademe.co.nz/a/listing/5959828752", "decade": 1970, "constr": "Mixed materials, iron roof", "cv": 750000, "landValue": 350000, "improvValue": 400000, "lastSale": 760000, "lastSaleDate": "2022-07-15", "lat": -41.296226501464844, "lon": 173.2491912841797, "hazards": [{"key": "liqA", "name": "Liquefaction", "scenario": "Regional assessment (Level A)", "kind": "ground", "detail": "Very Low Liquefaction Vulnerability", "depth": null, "rank": 0}], "outsideCoverage": false, "hazardScore": 0, "hazardCount": 0, "descScanned": true, "reno": true, "dblGlaz": false, "featEvidence": "beautifully renovated throughout"}, {"id": "5888774859", "address": "5 Albano Way, The Wood, Nelson", "listed": "17 Apr", "priceText": "Asking price: $960,000", "ask": 960000, "beds": 3, "baths": 2, "parking": 2, "floor": 198, "land": 1001, "url": "https://www.trademe.co.nz/a/listing/5888774859", "decade": 2000, "constr": "Brick, tile roof", "cv": 960000, "landValue": 570000, "improvValue": 390000, "lastSale": 562500, "lastSaleDate": "2011-05-18", "lat": -41.2700309753418, "lon": 173.29293823242188, "hazards": [{"key": "river2130", "name": "River flooding", "scenario": "2130 projection", "kind": "flood", "detail": ">20 - 50cm", "depth": ">20 - 50cm", "rank": 2}, {"key": "liqA", "name": "Liquefaction", "scenario": "Regional assessment (Level A)", "kind": "ground", "detail": "Liquefaction Damage is Possible", "depth": null, "rank": 2}], "outsideCoverage": false, "hazardScore": 4, "hazardCount": 2, "descScanned": true, "reno": false, "dblGlaz": false, "featEvidence": ""}, {"id": "6031028205", "address": "5 Orakei Street, Tahunanui, Nelson", "listed": "13 Jul", "priceText": "Asking price: $925,000", "ask": 925000, "beds": 4, "baths": 2, "parking": 4, "floor": 205, "land": 515, "url": "https://www.trademe.co.nz/a/listing/6031028205", "decade": 1940, "constr": "Roughcast, iron roof", "cv": 865000, "landValue": 470000, "improvValue": 395000, "lastSale": 870000, "lastSaleDate": "2023-05-19", "lat": -41.286781311035156, "lon": 173.25140380859375, "hazards": [{"key": "liqA", "name": "Liquefaction", "scenario": "Regional assessment (Level A)", "kind": "ground", "detail": "Very Low Liquefaction Vulnerability", "depth": null, "rank": 0}, {"key": "slopeIII", "name": "Slope instability", "scenario": "Tier III", "kind": "slope", "detail": "Tier III", "depth": null, "rank": 2}], "outsideCoverage": false, "hazardScore": 2, "hazardCount": 1, "descScanned": true, "reno": false, "dblGlaz": false, "featEvidence": ""}, {"id": "6064875981", "address": "52 Green Street, Tahunanui, Nelson", "listed": "3 Aug", "priceText": "Enquiries over $860,000", "ask": 860000, "beds": 3, "baths": 2, "parking": 2, "floor": 148, "land": 1146, "url": "https://www.trademe.co.nz/a/listing/6064875981", "decade": 1950, "constr": "Wood, tile roof", "cv": 890000, "landValue": 495000, "improvValue": 395000, "lastSale": 650000, "lastSaleDate": "2019-09-24", "lat": -41.2872428894043, "lon": 173.24288940429688, "hazards": [{"key": "coast2130", "name": "Coastal flooding", "scenario": "2130, SSP5-8.5M", "kind": "coastal", "detail": "0 - 20cm", "depth": "0 - 20cm", "rank": 1}, {"key": "liqA", "name": "Liquefaction", "scenario": "Regional assessment (Level A)", "kind": "ground", "detail": "Liquefaction Damage is Possible", "depth": null, "rank": 2}, {"key": "liqB", "name": "Liquefaction", "scenario": "Tāhunanui assessment (Level B)", "kind": "ground", "detail": "Medium Liquefaction Vulnerability", "depth": null, "rank": 2}], "outsideCoverage": false, "hazardScore": 5, "hazardCount": 3, "descScanned": true, "reno": true, "dblGlaz": false, "featEvidence": "beautifully renovated"}, {"id": "6104877044", "address": "6 Ruth Taylor Avenue, Stoke, Nelson", "listed": "28 Aug", "priceText": "Price by negotiation", "ask": null, "beds": 3, "baths": 2, "parking": 5, "floor": 207, "land": 705, "url": "https://www.trademe.co.nz/a/listing/6104877044", "decade": 2000, "constr": "Brick, iron roof", "cv": 900000, "landValue": 420000, "improvValue": 480000, "lastSale": 180000, "lastSaleDate": "2006-10-03", "lat": -41.31239700317383, "lon": 173.2186737060547, "hazards": [{"key": "liqA", "name": "Liquefaction", "scenario": "Regional assessment (Level A)", "kind": "ground", "detail": "Liquefaction Damage is Possible", "depth": null, "rank": 2}], "outsideCoverage": false, "hazardScore": 2, "hazardCount": 1, "descScanned": false, "reno": false, "dblGlaz": false, "featEvidence": ""}, {"id": "6064828779", "address": "9 Henrietta Way, Nelson, Nelson", "listed": "3 Aug", "priceText": "Enquiries over $659,000", "ask": 659000, "beds": 3, "baths": 1, "parking": 4, "floor": 125, "land": 981, "url": "https://www.trademe.co.nz/a/listing/6064828779", "decade": 2000, "constr": "Fibre cement, iron roof", "cv": 640000, "landValue": 325000, "improvValue": 315000, "lastSale": 555000, "lastSaleDate": "2020-02-26", "lat": -41.275978088378906, "lon": 173.2718048095703, "hazards": [{"key": "liqA", "name": "Liquefaction", "scenario": "Regional assessment (Level A)", "kind": "ground", "detail": "Very Low Liquefaction Vulnerability", "depth": null, "rank": 0}, {"key": "slopeIII", "name": "Slope instability", "scenario": "Tier III", "kind": "slope", "detail": "Tier III", "depth": null, "rank": 2}], "outsideCoverage": false, "hazardScore": 2, "hazardCount": 1, "descScanned": true, "reno": false, "dblGlaz": true, "featEvidence": "double glazing"}, {"id": "5941032933", "address": "934 Atawhai Drive, Atawhai, Nelson", "listed": "18 May", "priceText": "Enquiries over $975,000", "ask": 975000, "beds": 5, "baths": 2, "parking": 4, "floor": 190, "land": 1353, "url": "https://www.trademe.co.nz/a/listing/5941032933", "decade": 1890, "constr": "Wood, iron roof", "cv": 1000000, "landValue": 410000, "improvValue": 590000, "lastSale": 710000, "lastSaleDate": "2017-10-25", "lat": -41.2231559753418, "lon": 173.32484436035156, "hazards": [{"key": "coast2130", "name": "Coastal flooding", "scenario": "2130, SSP5-8.5M", "kind": "coastal", "detail": ">50cm - 1m", "depth": ">50cm - 1m", "rank": 3}, {"key": "liqA", "name": "Liquefaction", "scenario": "Regional assessment (Level A)", "kind": "ground", "detail": "Liquefaction Damage is Possible", "depth": null, "rank": 2}], "outsideCoverage": false, "hazardScore": 5, "hazardCount": 2, "descScanned": true, "reno": true, "dblGlaz": true, "featEvidence": "lovingly renovated; double-glazed studio"}], "pois": [{"n": "FreshChoice", "t": "supermarket", "lat": -41.27247, "lon": 173.2873}, {"n": "Bobby Franks", "t": "cafe", "lat": -41.26934, "lon": 173.29155}, {"n": "River Kitchen", "t": "cafe", "lat": -41.27023, "lon": 173.28454}, {"n": "Infused", "t": "cafe", "lat": -41.31254, "lon": 173.23429}, {"n": "Stoke Kindergarten", "t": "kindergarten", "lat": -41.31664, "lon": 173.23406}, {"n": "Oxford Street Cafe", "t": "cafe", "lat": -41.34078, "lon": 173.18433}, {"n": "Atomic Coffee Shop", "t": "cafe", "lat": -41.27221, "lon": 173.28713}, {"n": "Tasty Tucker - Bakery & Cafe", "t": "cafe", "lat": -41.27263, "lon": 173.283}, {"n": "Morrison Street Cafe Gallery", "t": "cafe", "lat": -41.27449, "lon": 173.28549}, {"n": "Cook's Corner", "t": "cafe", "lat": -41.27415, "lon": 173.28268}, {"n": "The Boathouse Cafe", "t": "cafe", "lat": -41.26594, "lon": 173.26653}, {"n": "Ake Ake Café", "t": "cafe", "lat": -41.27544, "lon": 173.28867}, {"n": "McCashin's Tap Room", "t": "cafe", "lat": -41.31865, "lon": 173.22558}, {"n": "Sweet As Cafe", "t": "cafe", "lat": -41.27457, "lon": 173.28369}, {"n": "The Coffee Factory", "t": "cafe", "lat": -41.32557, "lon": 173.21259}, {"n": "Society Coffee Roaster", "t": "cafe", "lat": -41.33371, "lon": 173.20113}, {"n": "Tern Coffee House", "t": "cafe", "lat": -41.27464, "lon": 173.28307}, {"n": "Kush Roadster & Micro Café", "t": "cafe", "lat": -41.26629, "lon": 173.27699}, {"n": "Alberta's", "t": "cafe", "lat": -41.2562, "lon": 173.1015}, {"n": "East St Cafe", "t": "cafe", "lat": -41.27469, "lon": 173.28281}, {"n": "Vanilla Bean Café", "t": "cafe", "lat": -41.33491, "lon": 173.17954}, {"n": "The Grape Escape", "t": "cafe", "lat": -41.3354, "lon": 173.15824}, {"n": "Nelson Training Centre", "t": "cafe", "lat": -41.27241, "lon": 173.27983}, {"n": "GoodFor", "t": "supermarket", "lat": -41.33586, "lon": 173.15839}, {"n": "The Baker's Coffee Shop", "t": "cafe", "lat": -41.27374, "lon": 173.28729}, {"n": "Nook", "t": "cafe", "lat": -41.29072, "lon": 173.24589}, {"n": "Rabbit Island Coffee Co.", "t": "cafe", "lat": -41.25625, "lon": 173.10147}, {"n": "The Qualitea Cafe", "t": "cafe", "lat": -41.27417, "lon": 173.28314}, {"n": "Brews & Bikes", "t": "cafe", "lat": -41.30634, "lon": 173.23235}, {"n": "The Goods", "t": "cafe", "lat": -41.33356, "lon": 173.16004}, {"n": "Wayfarer Cafe", "t": "cafe", "lat": -41.29928, "lon": 173.22532}, {"n": "Sublime Coffee", "t": "cafe", "lat": -41.29931, "lon": 173.22561}, {"n": "Victus Coffee & Eatery", "t": "cafe", "lat": -41.27244, "lon": 173.28554}, {"n": "The Suter Café", "t": "cafe", "lat": -41.27302, "lon": 173.29002}, {"n": "Waimea Kindergarten", "t": "kindergarten", "lat": -41.34226, "lon": 173.19612}, {"n": "Hardy St Eatery", "t": "cafe", "lat": -41.27438, "lon": 173.2824}, {"n": "Atawhai Kids Preschool", "t": "kindergarten", "lat": -41.24199, "lon": 173.3234}, {"n": "Teaology", "t": "cafe", "lat": -41.27418, "lon": 173.28307}, {"n": "Sublime Coffee Roasters", "t": "cafe", "lat": -41.27187, "lon": 173.28639}, {"n": "CJ Asian Supermarket", "t": "supermarket", "lat": -41.2739, "lon": 173.283}, {"n": "The Indian Café", "t": "cafe", "lat": -41.33856, "lon": 173.18421}, {"n": "The Indian Café", "t": "cafe", "lat": -41.31241, "lon": 173.23219}, {"n": "Tāhuna Breakfast Club", "t": "cafe", "lat": -41.28208, "lon": 173.24939}, {"n": "Lydia's Café", "t": "cafe", "lat": -41.33848, "lon": 173.18348}, {"n": "Halifax Cafe", "t": "cafe", "lat": -41.27094, "lon": 173.2831}, {"n": "Asian Food Store", "t": "supermarket", "lat": -41.27381, "lon": 173.2819}, {"n": "Coffee On Queen Beached", "t": "cafe", "lat": -41.2827, "lon": 173.24625}, {"n": "SaveMore", "t": "supermarket", "lat": -41.2714, "lon": 173.28254}, {"n": "Dabang Coffee", "t": "cafe", "lat": -41.27221, "lon": 173.28413}, {"n": "Broccoli Row Café", "t": "cafe", "lat": -41.27497, "lon": 173.28649}, {"n": "Prego", "t": "supermarket", "lat": -41.27312, "lon": 173.28676}, {"n": "91 on Nile", "t": "cafe", "lat": -41.27619, "lon": 173.28948}, {"n": "Saed's Falafel", "t": "cafe", "lat": -41.27242, "lon": 173.28535}, {"n": "Viva la Vaca", "t": "cafe", "lat": -41.27227, "lon": 173.28536}, {"n": "Atom Café", "t": "cafe", "lat": -41.27585, "lon": 173.2824}, {"n": "Dhara's Cafe", "t": "cafe", "lat": -41.2739, "lon": 173.28537}, {"n": "Sublime Coffee Roasters", "t": "cafe", "lat": -41.26531, "lon": 173.27227}, {"n": "Kitesurf Nelson", "t": "cafe", "lat": -41.28027, "lon": 173.25044}, {"n": "Bridge Street Kindergarten", "t": "kindergarten", "lat": -41.27227, "lon": 173.28961}, {"n": "Someday Somewhere", "t": "cafe", "lat": -41.27251, "lon": 173.28842}, {"n": "Nelson Montessori", "t": "kindergarten", "lat": -41.26155, "lon": 173.2973}, {"n": "Melrose Cafe", "t": "cafe", "lat": -41.28218, "lon": 173.28436}, {"n": "Blink Micro Cafe", "t": "cafe", "lat": -41.27337, "lon": 173.28364}, {"n": "Wucha", "t": "cafe", "lat": -41.2742, "lon": 173.28415}, {"n": "Porta Via", "t": "cafe", "lat": -41.27444, "lon": 173.28472}, {"n": "Yaza! Cafe", "t": "cafe", "lat": -41.27382, "lon": 173.28212}, {"n": "Back Alley Cafe", "t": "cafe", "lat": -41.27489, "lon": 173.28233}, {"n": "Greenmeadows Cafe", "t": "cafe", "lat": -41.31322, "lon": 173.23429}, {"n": "Yogiji's Food Mart", "t": "supermarket", "lat": -41.27188, "lon": 173.28663}, {"n": "Shelstar Coffee", "t": "cafe", "lat": -41.27777, "lon": 173.27506}, {"n": "Marsden Valley Café", "t": "cafe", "lat": -41.32159, "lon": 173.2575}, {"n": "Rutherford Street Kindergarten", "t": "kindergarten", "lat": -41.28026, "lon": 173.28085}, {"n": "Busy Bees Hardy Street", "t": "kindergarten", "lat": -41.27494, "lon": 173.2965}, {"n": "Busy Bees Stoke", "t": "kindergarten", "lat": -41.3183, "lon": 173.2163}, {"n": "Busy Bees Tahunanui", "t": "kindergarten", "lat": -41.28989, "lon": 173.24556}, {"n": "Nelson College for Girls", "t": "secondary", "lat": -41.27895, "lon": 173.28217}, {"n": "Nelson College", "t": "secondary", "lat": -41.28644, "lon": 173.27711}, {"n": "St Joseph's School", "t": "primary", "lat": -41.27912, "lon": 173.28811}, {"n": "Nelson Central School", "t": "primary", "lat": -41.27731, "lon": 173.28882}, {"n": "Victory Primary School", "t": "primary", "lat": -41.28349, "lon": 173.26863}, {"n": "Nelson Intermediate School", "t": "intermediate", "lat": -41.28838, "lon": 173.2676}, {"n": "Auckland Point School", "t": "primary", "lat": -41.26792, "lon": 173.27718}, {"n": "Hampden Street School", "t": "primary", "lat": -41.28408, "lon": 173.27789}, {"n": "Woolworths", "t": "supermarket", "lat": -41.27017, "lon": 173.28161}, {"n": "Clifton Terrace School", "t": "primary", "lat": -41.225, "lon": 173.32234}, {"n": "Henley School", "t": "primary", "lat": -41.34095, "lon": 173.19646}, {"n": "Waimea College", "t": "secondary", "lat": -41.33881, "lon": 173.198}, {"n": "Waimea Intermediate School", "t": "intermediate", "lat": -41.33952, "lon": 173.19506}, {"n": "Birchwood School", "t": "primary", "lat": -41.30645, "lon": 173.22477}, {"n": "Richmond School", "t": "primary", "lat": -41.33909, "lon": 173.18138}, {"n": "New World", "t": "supermarket", "lat": -41.27572, "lon": 173.27823}, {"n": "New World", "t": "supermarket", "lat": -41.31263, "lon": 173.23277}, {"n": "Enner Glynn School", "t": "primary", "lat": -41.30554, "lon": 173.25374}, {"n": "Nayland College", "t": "secondary", "lat": -41.30396, "lon": 173.23022}, {"n": "Woolworths", "t": "supermarket", "lat": -41.27291, "lon": 173.27755}, {"n": "Broadgreen Intermediate School", "t": "intermediate", "lat": -41.30649, "lon": 173.23319}, {"n": "Appleby School", "t": "primary", "lat": -41.30738, "lon": 173.1203}, {"n": "Little Dove Cafe", "t": "cafe", "lat": -41.26999, "lon": 173.28685}, {"n": "Salisbury School", "t": "secondary", "lat": -41.33592, "lon": 173.19368}, {"n": "Nayland Primary School", "t": "primary", "lat": -41.30774, "lon": 173.2322}, {"n": "Stoke School", "t": "primary", "lat": -41.3167, "lon": 173.23137}, {"n": "Garin College", "t": "secondary", "lat": -41.33496, "lon": 173.20578}, {"n": "St Paul's Catholic School", "t": "primary", "lat": -41.33735, "lon": 173.19381}, {"n": "Tāhunanui School", "t": "primary", "lat": -41.28648, "lon": 173.24601}, {"n": "OneSchool Global Nelson", "t": "secondary", "lat": -41.32459, "lon": 173.18021}, {"n": "Woolworths", "t": "supermarket", "lat": -41.31186, "lon": 173.23457}, {"n": "Founders Café", "t": "cafe", "lat": -41.26151, "lon": 173.29636}, {"n": "Hira School", "t": "primary", "lat": -41.21655, "lon": 173.39491}, {"n": "Hope School", "t": "primary", "lat": -41.36896, "lon": 173.14508}, {"n": "Active Explorers", "t": "kindergarten", "lat": -41.33272, "lon": 173.20167}, {"n": "Beach Cafe", "t": "cafe", "lat": -41.27997, "lon": 173.24465}, {"n": "Pic's Peanut Butter World", "t": "cafe", "lat": -41.32283, "lon": 173.21486}, {"n": "Te Kura Kaupapa Maori o Tuia te Matangi", "t": "primary", "lat": -41.3353, "lon": 173.19089}, {"n": "Ranzau School", "t": "primary", "lat": -41.34846, "lon": 173.14924}, {"n": "Nelson Christian Academy", "t": "primary", "lat": -41.31636, "lon": 173.24472}, {"n": "Maitai School", "t": "primary", "lat": -41.27348, "lon": 173.2921}, {"n": "Refresh Café", "t": "cafe", "lat": -41.33076, "lon": 173.17472}, {"n": "BestStart Berryfields Crossing", "t": "kindergarten", "lat": -41.33254, "lon": 173.17437}, {"n": "Alioke Eatery", "t": "cafe", "lat": -41.33454, "lon": 173.16531}, {"n": "Pomeroy's Coffee and Tea Company", "t": "cafe", "lat": -41.27373, "lon": 173.28338}, {"n": "Hattie's Cafe", "t": "cafe", "lat": -41.27138, "lon": 173.28196}, {"n": "Wata - Coffee & Eatery", "t": "cafe", "lat": -41.27326, "lon": 173.28341}, {"n": "Boat Shed Cafe", "t": "cafe", "lat": -41.26673, "lon": 173.26547}, {"n": "Woolworths", "t": "supermarket", "lat": -41.33478, "lon": 173.20263}, {"n": "Gloria Jean's", "t": "cafe", "lat": -41.33959, "lon": 173.18577}, {"n": "PAK'nSAVE", "t": "supermarket", "lat": -41.33859, "lon": 173.18675}, {"n": "Muffin Break", "t": "cafe", "lat": -41.33916, "lon": 173.1864}, {"n": "Ginger", "t": "cafe", "lat": -41.33928, "lon": 173.18678}, {"n": "Ambrosia Cafe", "t": "cafe", "lat": -41.33983, "lon": 173.18563}, {"n": "Tank", "t": "cafe", "lat": -41.33977, "lon": 173.18575}, {"n": "Woolworths", "t": "supermarket", "lat": -41.29858, "lon": 173.24113}, {"n": "Ruby's Espresso", "t": "cafe", "lat": -41.26243, "lon": 173.28221}]}</script>
+<script id="geo" type="application/json">{"coastline":["-412643,1732677 -13,-8","-412038,1733237 -78,32","-412912,1731615 -1,1","-412935,1731504 -17,16 -6,-4","-413078,1732006 4,-16 -4,16","-413030,1732003 -2,5","-412939,1731433 24,-12","-413189,1731686 19,-24 -25,-31 35,-40 7,8 41,2 -15,-28 -2,-15 10,-11 24,21 2,32 27,3 -12,-101 9,14 8,67 9,16 -7,-21 15,22","-412662,1732662 -49,-54","-413245,1731833 26,-65 3,-65 27,-17","-412843,1731313 -29,-55 25,-106","-412834,1731367 -9,9","-412849,1731362 -5,-8 -5,5","-412838,1731516 15,13 -14,4 7,15 30,2 -31,27 3,32","-413108,1732015 0,0","-413101,1731918 5,12 2,-17 7,11 10,-17 24,-4 -23,21 14,-7 -6,27 10,19 -7,24 9,-24 -10,-29 16,-31 -49,7","-412939,1731794 2,12 41,29 -2,-11 -35,-19 -6,-11","-412714,1732570 0,0","-412634,1732558 -18,27 1,-13 -38,-6 -4,23","-412459,1732805 -94,-173 -43,-19 -23,-30","-412624,1732617 4,-21 24,30 -2,-7 36,11 31,69","-412542,1732806 -10,19 -50,2 -22,-5 -28,-23 -1,-9 15,-3 8,17 71,2 9,-29 -12,-19","-412681,1732583 30,3 17,-28","-412693,1732589 12,-6","-412711,1732608 -59,-59","-412923,1732053 17,25 3,-16 -20,-9","-412786,1732442 -10,-77 -33,-34","-412829,1732331 -2,5","-412823,1732349 24,37 -11,-10 9,18 -12,-7 9,13 -10,-1 1,31 -10,-15 -8,5","-412789,1732517 3,-75","-412866,1732302 -20,-46 -54,-53 -47,-143","-412994,1732057 -17,17 39,48 6,83 -12,10 -25,-28 -6,-41 -8,-1 -14,88 0,-130 -33,-50 -9,-3 -6,12 29,32 9,53 -3,67 -15,-40 -7,21 -19,-4 -19,-23 -16,-3 -12,-28 -49,-29 -55,0 -24,-14 -48,-63 -1,-38","-413032,1732008 16,21 12,-19 -12,-16 -14,9","-413099,1731910 -2,8","-412835,1731832 -12,8","-412847,1731840 -18,17 -13,50 22,31","-412856,1731938 -2,27 34,-10","-412803,1731922 50,-83","-412753,1731839 36,-87 127,-412 71,-171 9,-49","-412798,1731399 2,-9","-412799,1731401 4,7","-412795,1731408 1,1","-412792,1731407 -5,-6","-412821,1731405 22,-4","-412836,1731467 11,4 -11,-4","-412800,1731419 -11,60 -20,31","-412794,1731409 2,12 -8,-2","-412831,1731510 -7,6","-412878,1731385 18,-11 -1,-36","-412908,1731407 30,-12","-412878,1731395 0,-10","-412903,1731580 54,-171 -7,-26","-412705,1731247 -6,16 -11,3 7,20 -8,24 -10,7 -7,-15 -14,45 -18,20 4,15 -7,12 -6,-9 -9,17","-412790,1731402 -2,5","-412915,1731421 7,-14","-412983,1731489 13,-36 31,-20","-412985,1731492 18,17","-412965,1731508 -18,-19","-412967,1731509 -12,28","-412939,1731480 8,-14 -13,18 -8,-4 2,9 -7,-10 -8,29","-412828,1731609 25,26 1,36","-412979,1731537 40,-57","-413044,1731600 -10,-27 10,-24 59,-57","-412856,1731383 -53,101","-412913,1731612 -3,-13 13,-19","-412909,1731484 -9,16 -17,4","-412958,1731516 -2,19 -26,16 -2,25 -13,15 1,23 -12,1 3,31","-412809,1731716 5,76 -31,40","-412802,1731671 -7,45","-412861,1731338 2,-4","-412859,1731334 2,-6","-412856,1731326 10,-11","-412857,1731328 1,-2","-412846,1731315 3,-2","-412824,1731955 21,-33","-412859,1731359 10,3","-412843,1731376 11,34 11,-21 -13,-22","-412797,1731401 -1,-2","-412796,1731390 40,-87 54,-81 9,-35","-412774,1731235 -45,84 -10,9 -6,-7 -12,24","-412847,1731345 28,35 -2,25","-412913,1731616 5,23 -48,42 -6,36 -26,27 -4,16 13,36 34,-13 58,6 10,-6 17,-75 -2,-29 -11,-15 17,-74","-412850,1731492 -12,75 -24,42 -23,15","-412909,1731624 -3,-9","-412856,1731585 9,-101 -3,8","-412856,1731590 0,-5","-412914,1731613 1,-1","-412970,1731639 20,-5 33,-32 3,11","-412975,1731639 5,0","-413009,1731646 34,-7","-412116,1733269 -68,29 -20,-12 -22,-29 -3,-27 -37,-33 -53,-11 -45,-27 -56,6 -73,-36 -64,-139 -66,-68 1,-31 -14,-3 -8,-69 -16,-17 27,13 16,26 74,3 1,-38","-411839,1733630 -94,-187 -29,-88 -68,-126","-412818,1732403 0,0","-412819,1732409 0,0","-413317,1731934 9,-20 13,19 14,-15 -10,-22 7,-18 4,-9 8,6 11,-37 16,-5","-412991,1732056 -3,1","-412987,1732060 -4,-4","-412812,1732383 0,0","-412811,1732384 0,0","-412811,1732384 0,0","-412813,1732395 5,4 -5,-4","-412809,1732372 5,4 -5,-4","-412810,1732372 0,0","-412814,1732397 0,0","-412831,1732336 8,13","-412859,1732316 -7,-14","-412831,1732420 -9,-92 -19,-12","-412770,1732549 -19,-32","-412656,1732669 -6,-7","-412562,1732758 -9,17","-412571,1732775 -10,18 -20,-7 17,-10 -4,-30 -29,-15 19,-19 -30,-24","-412628,1732688 -6,4 -9,-15","-412030,1733229 -51,-53 -196,-150 -93,-96 -48,-66","-412406,1732899 7,7 -11,-13 4,6","-412396,1732913 -2,-6 2,6","-412384,1732928 21,23 -21,-23","-412394,1732914 9,12 -9,-12","-412499,1732759 73,112 91,110 63,64 181,131 53,61","-412177,1733278 0,0","-412619,1732583 -12,31 7,3","-412418,1732864 -41,-59","-412531,1732699 32,60","-413317,1731936 0,-2","-413309,1731993 -8,-57"],
+"river":["-413436,1731178 52,5 43,36 49,9 46,38 19,-4 43,13 30,-12 14,3 73,49 13,20 24,7 32,45 16,2 49,-24 55,26","-413395,1733245 -11,-36 -10,1 -11,-17 0,-17 -13,-1 -18,-21 3,-21 -29,-11 2,-16 -28,-26 -4,-33 -20,-21 7,-48 -10,-29 -38,-44 -16,-39 -16,1 16,-17 -14,-9 -10,-34 -12,-10 -5,-29 11,-11 0,-21 12,0 9,-13 -8,-20 6,-15 20,-4 2,-32 12,12 12,-12 -14,-8 -2,-48 -24,-13 11,-33 -13,-17 -14,2 -7,-10 19,-54 -26,-12 -3,-21 -19,12 0,26 -22,-12 -12,-70 -19,-18 -19,0 1,-21 -35,-58 -19,5 -18,26 6,-33 -17,-12 -3,-25 -30,-37 -33,-23 14,-34 -33,-10 26,-54 -34,-26 -16,8 -13,-6 -25,-66 8,-38 -22,-29 -14,-2 2,-32 25,-70 28,1 24,-30 41,-10 -7,-26 -33,-4 -11,-11 2,-33 30,11 15,-35 -42,-77 6,-7 8,6 49,-42 -14,-7 -18,9 -18,-15 -32,7 -14,-37 -25,-10 13,-20 1,-24 -17,4 -18,22 -34,-5 -23,-26","-412930,1733676 8,9 23,-41 -11,-16 21,-16 -13,-29 13,-24 -5,-11 -15,8 -8,-6 14,-45 -13,-27 10,-35 -51,17 -12,-19 6,-25 -22,-5 3,-17 -11,-15 21,-22 31,-1 5,-55 -18,-18 17,-12 -18,-23 61,-18 12,44 33,40 49,-15 19,10 18,-19 -11,-75 17,3 17,-20 3,-85 22,-7 2,-29 -30,-4 5,-25 -11,-34 -29,-17 1,-23 82,-102 2,-45 35,-20","-412763,1732922 8,20","-412766,1732913 3,9","-413439,1733605 28,-12 15,9 71,-5 59,24","-413834,1732994 16,-26 34,-14 17,-39 15,-3 17,-47 7,-4 13,11 7,-12 30,-4 4,-44 8,-3 4,14 16,-2 20,-20","-413587,1733329 -20,-9 -28,-65 -53,-65","-413746,1733344 23,-84 22,-24 13,-46 2,-29 -12,-20 18,-13 5,-77 26,-42 39,10 25,-25 -14,-45 4,-18 -12,-9 17,-9 4,-35","-412799,1732891 23,5 10,17","-413487,1733548 -27,7 -21,-26 -12,-36 3,-65 22,-34 39,-24 15,-33 26,-7 17,18 8,-7 23,-43 -1,-53","-413249,1733304 -74,19 -23,-36 -10,-8 -5,8 -34,-42","-412658,1732807 20,8 27,33 72,-1 13,-9"],
+"road":["-412159,1733300 22,60 40,15 59,187 -45,142","-412249,1733213 29,55","-412799,1732507 38,52","-412510,1733104 35,39 95,21","-412715,1732604 83,95","-412923,1732461 58,14","-412673,1732776 42,-67","-412631,1732709 -37,59","-413165,1731358 -183,202","-413451,1731683 72,115","-413012,1732384 -12,-124 -80,-77","-413087,1732199 65,64 2,98","-413104,1732183 -74,-69 -66,-5","-412642,1732868 80,119","-412205,1733286 46,14","-413366,1731580 -60,67","-413350,1731859 26,133","-412328,1733184 46,10","-412865,1732475 43,16","-413589,1731463 -129,-205","-413482,1731634 -107,-171","-413244,1732108 67,5 90,86","-413245,1732109 -47,-53","-413291,1732056 46,52","-412543,1733026 17,41","-413325,1731992 -26,-133","-413109,1731296 -28,32","-412761,1732559 46,45","-412961,1732452 32,8"]}</script>
+<script>
+(function(){
+"use strict";
+var DATA = JSON.parse(document.getElementById('data').textContent);
+var GEO  = JSON.parse(document.getElementById('geo').textContent);
+var P = DATA.properties, POIS = DATA.pois;
+var hidden = {};                       /* property ids manually un-ticked in the list (removed from map) */
+var F = {built:null, price:null, land:null, floor:null, beds:null};  /* "more filters" thresholds */
+
+/* ---------- severity ---------- */
+function severity(p){
+  if (p.outsideCoverage) return 'none';
+  var hz = (p.hazards||[]).filter(function(h){return h.rank>0});
+  var flood = hz.some(function(h){return h.kind==='flood'||h.kind==='coastal'});
+  if (flood || hz.length >= 2) return 'high';
+  if (hz.length === 1) return 'watch';
+  return 'ok';
+}
+var SEVCOL = {high:'var(--high)', watch:'var(--watch)', ok:'var(--ok)', none:'var(--none)'};
+P.forEach(function(p){ p.sev = severity(p); });
+
+/* ---------- distance ---------- */
+function dist(aLat,aLon,bLat,bLon){
+  var R=6371, dLat=(bLat-aLat)*Math.PI/180, dLon=(bLon-aLon)*Math.PI/180;
+  var la1=aLat*Math.PI/180, la2=bLat*Math.PI/180;
+  var h=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)*Math.sin(dLon/2);
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+function fmtKm(km){ return km<1 ? Math.round(km*1000)+' m' : km.toFixed(km<10?1:0)+' km'; }
+/* straight-line walk estimate at ~4.5 km/h (allows for the road not being a straight line) */
+function fmtWalk(km){ var min=Math.max(1,Math.round(km/4.5*60)); return '≈ '+min+' min walk'; }
+
+/* ---------- reference selector ---------- */
+var TYPE_LABEL = {primary:'primary school', intermediate:'intermediate school', secondary:'secondary school',
+                  kindergarten:'kindergarten / preschool', cafe:'café', supermarket:'supermarket', bar:'craft beer bar'};
+
+/* Personal reference points — pinned to the top of "A specific place".
+   Coordinates from OpenStreetMap for the named landmarks. */
+var CUSTOM = [
+  {n:"Parents' house", note:'Aldinga Reserve, Stoke',                    lat:-41.3113062, lon:173.2236205},
+  {n:"Sister's house", note:"St Paul's Anglican church, Brightwater",    lat:-41.3703624, lon:173.1038358},
+  {n:'Nelson weekend market', note:'Montgomery Square',                  lat:-41.2733000, lon:173.2828000},
+  {n:'The Free House', note:'craft beer bar',                            lat:-41.2733148, lon:173.2874619}
+];
+
+/* Craft beer bars around Nelson, for "Nearest craft beer bar" (OpenStreetMap). */
+var BARS = [
+  {n:'The Free House',              lat:-41.2733148, lon:173.2874619},
+  {n:'Craft Beer Depot',            lat:-41.2713414, lon:173.2820581},
+  {n:'Two Thumbs Brewery',          lat:-41.2719025, lon:173.2865607},
+  {n:'Sprig + Fern Brewing Co.',    lat:-41.2744790, lon:173.2864905},
+  {n:'Eddyline Brewery, Richmond',  lat:-41.3324782, lon:173.2011256},
+  {n:'Sprig & Fern, Brightwater',   lat:-41.3763457, lon:173.1098989},
+  {n:'Sprig & Fern, Wakefield',     lat:-41.2529708, lon:173.0949969}
+];
+
+var refSel = document.getElementById('ref');
+var groups = [['Nearest of a kind', [
+  ['type:primary','Nearest primary school'],
+  ['type:cafe','Nearest café'],
+  ['type:supermarket','Nearest supermarket'],
+  ['type:bar','Nearest craft beer bar'],
+  ['type:intermediate','Nearest intermediate school'],
+  ['type:secondary','Nearest secondary school']
+]]];
+var named = POIS.filter(function(p){ return p.t!=='kindergarten'; }).sort(function(a,b){
+  if(a.t!==b.t) return a.t.localeCompare(b.t);
+  return a.n.localeCompare(b.n);
+});
+/* CUSTOM entries pinned above the sorted OSM places (kindergartens excluded) */
+var specific = CUSTOM.concat(named);
+groups.push(['A specific place', specific.map(function(p,i){
+  var detail = p.note || TYPE_LABEL[p.t];
+  return ['poi:'+i, p.n+' — '+detail];
+})]);
+groups.forEach(function(g){
+  var og=document.createElement('optgroup'); og.label=g[0];
+  g[1].forEach(function(o){ var el=document.createElement('option'); el.value=o[0]; el.textContent=o[1]; og.appendChild(el); });
+  refSel.appendChild(og);
+});
+refSel.value='type:primary';
+
+function refFor(p){
+  var v=refSel.value;
+  if(v.indexOf('poi:')===0){
+    var poi=specific[+v.slice(4)];
+    return {km:dist(p.lat,p.lon,poi.lat,poi.lon), name:poi.n};
+  }
+  var t=v.slice(5), best=null;
+  var pool = t==='bar' ? BARS : POIS;
+  pool.forEach(function(q){
+    if(t!=='bar' && q.t!==t) return;
+    var d=dist(p.lat,p.lon,q.lat,q.lon);
+    if(!best||d<best.km) best={km:d,name:q.n};
+  });
+  return best||{km:NaN,name:'—'};
+}
+
+/* ---------- map ---------- */
+var VB={w:460,h:560,pad:16};
+var lats=P.map(function(p){return p.lat}), lons=P.map(function(p){return p.lon});
+var b={n:Math.max.apply(null,lats)+.012, s:Math.min.apply(null,lats)-.012,
+       e:Math.max.apply(null,lons)+.012, w:Math.min.apply(null,lons)-.012};
+var kx=Math.cos((b.n+b.s)/2*Math.PI/180);
+var spanX=(b.e-b.w)*kx, spanY=(b.n-b.s);
+var scale=Math.min((VB.w-2*VB.pad)/spanX,(VB.h-2*VB.pad)/spanY);
+var offX=VB.pad+((VB.w-2*VB.pad)-spanX*scale)/2;
+var offY=VB.pad+((VB.h-2*VB.pad)-spanY*scale)/2;
+function X(lon){ return offX+(lon-b.w)*kx*scale }
+function Y(lat){ return offY+(b.n-lat)*scale }
+
+function decode(s){
+  var parts=s.split(' '), lat=0, lon=0, out=[];
+  for(var i=0;i<parts.length;i++){
+    var kv=parts[i].split(',');
+    lat+=+kv[0]; lon+=+kv[1];
+    out.push([lat/1e4, lon/1e4]);
+  }
+  return out;
+}
+function pathOf(pts){
+  var d='';
+  for(var i=0;i<pts.length;i++) d+=(i?'L':'M')+X(pts[i][1]).toFixed(1)+' '+Y(pts[i][0]).toFixed(1);
+  return d;
+}
+var svg=document.getElementById('map');
+var NS='http://www.w3.org/2000/svg';
+function el(n,a){ var e=document.createElementNS(NS,n); for(var k in a) e.setAttribute(k,a[k]); return e; }
+
+function drawBase(){
+  var g=el('g',{});
+  GEO.road.forEach(function(s){ g.appendChild(el('path',{d:pathOf(decode(s)),fill:'none',stroke:'var(--road)','stroke-width':1.6,'stroke-linecap':'round'})); });
+  GEO.river.forEach(function(s){ g.appendChild(el('path',{d:pathOf(decode(s)),fill:'none',stroke:'var(--water)','stroke-width':1.4,'stroke-linecap':'round'})); });
+  GEO.coastline.forEach(function(s){ g.appendChild(el('path',{d:pathOf(decode(s)),fill:'none',stroke:'var(--water)','stroke-width':2.6,'stroke-linecap':'round','stroke-linejoin':'round'})); });
+  svg.appendChild(g);
+}
+drawBase();
+
+/* suburb labels, for orientation */
+[['Atawhai',-41.2420,173.3150,'end'],['Marybank',-41.2270,173.3210,'end'],
+ ['The Wood',-41.2645,173.2950,'start'],['Nelson CBD',-41.2690,173.2820,'end'],
+ ['Maitai',-41.2800,173.3060,'start'],['Washington Valley',-41.2710,173.2670,'end'],
+ ['Nelson South',-41.2930,173.2790,'start'],['Tahunanui',-41.2930,173.2440,'middle'],
+ ['Wakatu',-41.3010,173.2560,'start'],['Stoke',-41.3220,173.2300,'middle'],
+ ['Best Island',-41.3070,173.1640,'start']].forEach(function(L){
+  var t=el('text',{x:X(L[2]).toFixed(1),y:Y(L[1]).toFixed(1),fill:'var(--muted)','font-size':9.5,
+    'text-anchor':L[3],'font-family':'Archivo Narrow, sans-serif','letter-spacing':'.06em',
+    'style':'text-transform:uppercase;opacity:.85'});
+  t.textContent=L[0]; svg.appendChild(t);
+});
+
+/* scale bar */
+(function(){
+  var kmPerPx = 111/scale;          /* scale is px per degree of latitude */
+  var target = 2;
+  var px = target/kmPerPx;
+  document.getElementById('scalebar').textContent = Math.round(spanX*111*kx*0+ (b.e-b.w)*111*kx) + ' km across';
+  var y = VB.h-16, x = VB.pad+4;
+  svg.appendChild(el('path',{d:'M'+x+' '+y+'H'+(x+px),stroke:'var(--muted)','stroke-width':1.6}));
+  svg.appendChild(el('path',{d:'M'+x+' '+(y-3)+'V'+(y+3)+'M'+(x+px)+' '+(y-3)+'V'+(y+3),stroke:'var(--muted)','stroke-width':1.6}));
+  var t=el('text',{x:x+px+6,y:y+3.5,fill:'var(--muted)','font-size':10,'font-family':'IBM Plex Mono, monospace'});
+  t.textContent=target+' km'; svg.appendChild(t);
+})();
+
+var dotG=el('g',{}); svg.appendChild(dotG);
+var dots={};
+P.forEach(function(p){
+  var c=el('circle',{cx:X(p.lon).toFixed(1),cy:Y(p.lat).toFixed(1),r:5,
+    fill:SEVCOL[p.sev],stroke:'var(--surface)','stroke-width':1.5,class:'dot','data-id':p.id});
+  c.style.cursor='pointer';
+  c.addEventListener('click',function(){ select(p.id,true); });
+  dotG.appendChild(c);
+  dots[p.id]=c;
+});
+
+/* marker for a chosen Specific Place (drawn on top of the property dots) */
+var placeMarker=el('g',{}); placeMarker.style.display='none'; svg.appendChild(placeMarker);
+function updatePlaceMarker(){
+  while(placeMarker.firstChild) placeMarker.removeChild(placeMarker.firstChild);
+  var v=refSel.value;
+  if(document.getElementById('rank').value!=='distance' || v.indexOf('poi:')!==0){
+    placeMarker.style.display='none'; return;
+  }
+  placeMarker.style.display='';
+  var place=specific[+v.slice(4)];
+  var px=X(place.lon), py=Y(place.lat), pad=9;
+  var cx=Math.max(pad,Math.min(VB.w-pad,px)), cy=Math.max(pad,Math.min(VB.h-pad,py));
+  var off=Math.abs(cx-px)>0.5||Math.abs(cy-py)>0.5;   /* place sits beyond the map frame */
+  var s=6.5;
+  placeMarker.appendChild(el('path',{d:'M'+cx+' '+(cy-s)+'L'+(cx+s)+' '+cy+'L'+cx+' '+(cy+s)+'L'+(cx-s)+' '+cy+'Z',
+    fill:'var(--accent)',stroke:'var(--surface)','stroke-width':1.8,opacity:off?0.65:1}));
+  var name=place.n.length>22?place.n.slice(0,21)+'…':place.n;
+  var anchor=cx>VB.w-110?'end':'start', tx=anchor==='end'?cx-10:cx+10;
+  var t=el('text',{x:tx.toFixed(1),y:(cy+3.6).toFixed(1),fill:'var(--accent)','font-size':10.5,
+    'font-family':'Archivo Narrow, sans-serif','font-weight':700,'text-anchor':anchor,
+    'style':'text-transform:uppercase;letter-spacing:.05em'});
+  t.textContent=name+(off?' (off map ↗)':'');
+  placeMarker.appendChild(t);
+}
+
+/* ---------- rendering ---------- */
+var rowsEl=document.getElementById('rows');
+var openId=null;
+
+function priceOf(p){ return p.ask || p.cv || 0; }
+function fmt$(n){ return n ? '$'+n.toLocaleString('en-NZ') : '—'; }
+
+/* ---------- listing-description feature scan ----------
+   Each property's `reno` / `dblGlaz` flags come from scanning its Trade Me /
+   agency listing description for the terms below. The descriptions live on
+   third-party sites and can't be embedded here, so the scan is run when the
+   data is built (see build.py); scanText() is the exact matcher that was used
+   and can be re-run over any description string. `featEvidence` holds the
+   short phrase(s) that matched, and `descScanned` is false where no public
+   description could be found to scan. */
+var GLAZ_TERMS = ['double glaz','double-glaz','double glazed'];
+var RENO_TERMS = ['renovat','refurbish','modernis','moderniz','redone','re-done',
+                  'fully updated','recently updated','tastefully updated','beautifully updated',
+                  'brand new kitchen','new kitchen and bathroom','new bathroom and kitchen','upgraded kitchen'];
+function scanText(text){
+  var t=(text||'').toLowerCase();
+  return {glaz:GLAZ_TERMS.some(function(w){return t.indexOf(w)>=0}),
+          reno:RENO_TERMS.some(function(w){return t.indexOf(w)>=0})};
+}
+function hasFeature(p){ return !!(p.reno||p.dblGlaz); }
+/* a 2130 flood/coastal projection, as opposed to a present-day flood hazard */
+function isFuture(h){ return (h.kind==='flood'||h.kind==='coastal') && /2130/.test(h.scenario||''); }
+
+/* every property shown in the list (and eligible for the map) must clear these */
+function passesFilters(p){
+  /* keep listings with no public description in view (grey "no reno info" flag) */
+  if(document.getElementById('fReno').checked && p.descScanned && !hasFeature(p)) return false;
+  if(document.getElementById('fFlood').checked &&
+     (p.hazards||[]).some(function(h){return h.rank>0&&(h.kind==='flood'||h.kind==='coastal')})) return false;
+  if(document.getElementById('fSlope').checked &&
+     (p.hazards||[]).some(function(h){return h.rank>0&&(h.kind==='slope'||h.kind==='ground'||h.kind==='fault')})) return false;
+  if(F.built!=null && p.decade!=null && p.decade < F.built) return false;
+  if(F.price!=null && priceOf(p) > F.price)                 return false;
+  if(F.land!=null  && p.land!=null  && p.land  < F.land)    return false;
+  if(F.floor!=null && p.floor!=null && p.floor < F.floor)   return false;
+  if(F.beds!=null  && p.beds!=null  && p.beds  < F.beds)    return false;
+  return true;
+}
+
+function sorted(){
+  var mode=document.getElementById('rank').value;
+  var list=P.filter(passesFilters);
+  var cmp;
+  /* properties with no council coverage sort last — absence of data is not absence of hazard */
+  if(mode==='hazard') cmp=function(a,b){
+    if(a.outsideCoverage!==b.outsideCoverage) return a.outsideCoverage?1:-1;
+    return (a.hazardScore-b.hazardScore) || (a.hazardCount-b.hazardCount) || a.address.localeCompare(b.address);
+  };
+  else if(mode==='age-old') cmp=function(a,b){ return a.decade-b.decade || a.address.localeCompare(b.address) };
+  else if(mode==='age-new') cmp=function(a,b){ return b.decade-a.decade || a.address.localeCompare(b.address) };
+  else if(mode==='distance') cmp=function(a,b){ return refFor(a).km-refFor(b).km };
+  else if(mode==='price') cmp=function(a,b){ return priceOf(a)-priceOf(b) };
+  else if(mode==='land') cmp=function(a,b){ return b.land-a.land };
+  else cmp=function(a,b){ return b.floor-a.floor };
+  return list.sort(cmp);
+}
+
+function metricFor(p,mode){
+  if(mode==='distance'){ var r=refFor(p); return [fmtKm(r.km), r.name.length>22?r.name.slice(0,21)+'…':r.name, fmtWalk(r.km)]; }
+  if(mode==='age-old'||mode==='age-new') return [p.decade+'s','built'];
+  if(mode==='price') return [p.ask?fmt$(p.ask):fmt$(p.cv), p.ask?'asking':'capital value'];
+  if(mode==='land') return [p.land.toLocaleString()+' m²','land'];
+  if(mode==='floor') return [p.floor+' m²','floor'];
+  if(p.outsideCoverage) return ['—','no council data'];
+  return [String(p.hazardCount), p.hazardCount===1?'flag':'flags'];
+}
+
+function chipsFor(p){
+  if(p.outsideCoverage) return [['plain','Outside NCC hazard coverage']];
+  var hz=(p.hazards||[]).filter(function(h){return h.rank>0});
+  if(!hz.length) return [['ok','Nothing flagged']];
+  return hz.map(function(h){
+    var cls = isFuture(h) ? 'future' : (h.rank>=3?'high':'watch');
+    var label = h.name==='Liquefaction' ? 'Liquefaction: '+h.detail.replace('Liquefaction Damage is ','').replace(' Liquefaction Vulnerability','')
+              : h.kind==='slope' ? h.scenario.replace(' (highest)','')+' slope'
+              : h.name+' '+(h.depth||'');
+    return [cls, label.trim()+(isFuture(h)?' · 2130':'')];
+  });
+}
+
+function detailHTML(p){
+  var hz=(p.hazards||[]);
+  var rows = hz.length ? hz.map(function(h){
+      var cls = isFuture(h) ? 'sev-future' : (h.rank>=3?'sev-high':(h.rank>0?'sev-watch':'sev-ok'));
+      return '<li class="'+cls+'"><span class="hzname">'+h.name+'</span><span class="hzscn">'+h.scenario+'</span><span class="hzval">'+h.detail+'</span></li>';
+    }).join('')
+    : '<li class="sev-ok"><span class="hzname">'+(p.outsideCoverage?'No council data':'Nothing flagged')+'</span><span class="hzscn">'+(p.outsideCoverage?'Site is outside the Nelson City Council boundary — Tasman District Council publishes this area':'Point falls outside every Nelson City Council hazard polygon queried')+'</span><span class="hzval"></span></li>';
+
+  var kinds=['primary','cafe','supermarket','intermediate','secondary'];
+  var near=kinds.map(function(t){
+    var best=null;
+    POIS.forEach(function(q){ if(q.t!==t) return; var d=dist(p.lat,p.lon,q.lat,q.lon); if(!best||d<best.km) best={km:d,name:q.n}; });
+    if(!best) return '';
+    return '<li><span>'+best.name+'</span><em>'+fmtKm(best.km)+'</em></li>';
+  }).join('');
+
+  return '<div class="detail">'
+    + '<dl>'
+    + '<div><dt>Decade built</dt><dd>'+p.decade+'s</dd></div>'
+    + '<div><dt>Construction</dt><dd style="font-size:12.5px">'+(p.constr||'—')+'</dd></div>'
+    + '<div><dt>Capital value</dt><dd>'+fmt$(p.cv)+'</dd></div>'
+    + '<div><dt>Land value</dt><dd>'+fmt$(p.landValue)+'</dd></div>'
+    + '<div><dt>Last sale</dt><dd>'+fmt$(p.lastSale)+(p.lastSaleDate?' <span style="color:var(--muted)">'+p.lastSaleDate.slice(0,4)+'</span>':'')+'</dd></div>'
+    + '<div><dt>Beds / baths</dt><dd>'+p.beds+' / '+p.baths+'</dd></div>'
+    + '<div><dt>Floor / land</dt><dd>'+p.floor+' / '+p.land+' m²</dd></div>'
+    + '<div><dt>Listed</dt><dd>'+p.listed+'</dd></div>'
+    + '<div><dt>Description scan</dt><dd style="font-size:12px">'+(
+        !p.descScanned ? '<span style="color:var(--muted)">no public description found</span>'
+        : hasFeature(p) ? (p.featEvidence || 'glazing / reno terms found')
+        : '<span style="color:var(--muted)">no glazing / reno terms</span>'
+      )+'</dd></div>'
+    + '</dl>'
+    + '<h4 style="font-family:Archivo Narrow,sans-serif;text-transform:uppercase;letter-spacing:.09em;font-size:10px;color:var(--muted);margin:0 0 6px;font-weight:600">Hazard layers intersecting this point</h4>'
+    + '<ul class="hz">'+rows+'</ul>'
+    + '<div class="nearest"><h4>Nearest of each kind</h4><ul>'+near+'</ul></div>'
+    + '<div class="acts"><a href="'+p.url+'" target="_blank" rel="noopener">Trade Me listing ↗</a>'
+    + '<a href="https://experience.arcgis.com/experience/188c8d0a60d344ccbd80f8aa71c75184/page/River-Flooding" target="_blank" rel="noopener">Council hazard viewer ↗</a>'
+    + '<span style="color:var(--muted);font-family:IBM Plex Mono,monospace;font-size:12px">'+p.lat.toFixed(5)+', '+p.lon.toFixed(5)+'</span></div>'
+    + '</div>';
+}
+
+function syncRefVisibility(){
+  document.getElementById('refField').hidden = document.getElementById('rank').value!=='distance';
+}
+
+function render(){
+  syncRefVisibility();
+  var mode=document.getElementById('rank').value;
+  var list=sorted();
+  document.getElementById('count').textContent=list.length+' of '+P.length+' shown';
+  var titles={hazard:'Least exposed first','age-old':'Oldest first','age-new':'Newest first',
+              distance:'Closest first',price:'Cheapest first',land:'Most land first',floor:'Largest floor first'};
+  document.getElementById('listTitle').textContent=titles[mode];
+  rowsEl.innerHTML='';
+  list.forEach(function(p,i){
+    var li=document.createElement('li');
+    li.className='row'+(hidden[p.id]?' mapoff':''); li.style.setProperty('--sev',SEVCOL[p.sev]);
+    li.tabIndex=0; li.setAttribute('aria-expanded', openId===p.id ? 'true':'false');
+    var m=metricFor(p,mode);
+    var fchips=(p.dblGlaz?'<span class="chip feat">Double glazed</span>':'')
+             +(p.reno?'<span class="chip feat">Renovated</span>':'')
+             +(!p.descScanned?'<span class="chip plain">No reno info found</span>':'');
+    var chips=chipsFor(p).map(function(c){return '<span class="chip '+c[0]+'">'+c[1]+'</span>'}).join('')+fchips;
+    li.innerHTML='<span class="rank"><input type="checkbox" class="mapchk" '+(hidden[p.id]?'':'checked')+' aria-label="Show this property on the map">'+(i+1)+'</span>'
+      +'<span class="addr">'+p.address.replace(/, Nelson$/,'')+'</span>'
+      +'<span class="metric"><b>'+m[0]+'</b><span>'+m[1]+'</span>'+(m[2]?'<span class="walk">'+m[2]+'</span>':'')+'</span>'
+      +'<span class="sub"><b>'+p.decade+'s</b><span>'+p.priceText+'</span><b>'+p.beds+'</b><span>bd</span><b>'+p.land+'</b><span>m² land</span></span>'
+      +'<span class="chips">'+chips+'</span>'
+      +(openId===p.id?detailHTML(p):'');
+    li.addEventListener('click',function(e){ if(e.target.closest('a')||e.target.classList.contains('mapchk')) return; select(p.id); });
+    li.addEventListener('keydown',function(e){ if(e.target.classList.contains('mapchk')) return; if(e.key==='Enter'||e.key===' '){ e.preventDefault(); select(p.id); }});
+    var chk=li.querySelector('.mapchk');
+    chk.addEventListener('click',function(e){ e.stopPropagation(); });
+    chk.addEventListener('change',function(e){
+      e.stopPropagation();
+      if(this.checked) delete hidden[p.id]; else hidden[p.id]=true;
+      li.classList.toggle('mapoff', !this.checked);
+      paintDots();
+    });
+    rowsEl.appendChild(li);
+  });
+  paintDots();
+  updatePlaceMarker();
+}
+
+function paintDots(){
+  P.forEach(function(p){
+    var c=dots[p.id];
+    var vis = passesFilters(p) && !hidden[p.id];
+    c.style.display = vis ? '' : 'none';
+    var on = vis && openId===p.id;
+    c.setAttribute('r', on?8:5);
+    c.setAttribute('stroke-width', on?2.5:1.5);
+    c.setAttribute('stroke', on?'var(--accent)':'var(--surface)');
+  });
+}
+
+function select(id, scroll){
+  openId = (openId===id) ? null : id;
+  render();
+  if(openId && scroll){
+    var node=rowsEl.querySelector('[aria-expanded="true"]');
+    if(node) node.scrollIntoView({block:'center',behavior:'smooth'});
+  }
+}
+
+/* ---------- summary rail ---------- */
+(function(){
+  var flood=P.filter(function(p){return (p.hazards||[]).some(function(h){return h.rank>0&&(h.kind==='flood'||h.kind==='coastal')})}).length;
+  var clear=P.filter(function(p){return p.sev==='ok'}).length;
+  var decs=P.map(function(p){return p.decade});
+  var med=decs.slice().sort(function(a,b){return a-b})[Math.floor(decs.length/2)];
+  var rail=document.getElementById('rail');
+  [[P.length,'listings'],[flood,'in a flood zone'],[clear,'nothing flagged'],[med+'s','median build']].forEach(function(s){
+    var d=document.createElement('div'); d.className='stat';
+    d.innerHTML='<b>'+s[0]+'</b><span>'+s[1]+'</span>'; rail.appendChild(d);
+  });
+})();
+
+/* ---------- more filters ---------- */
+(function(){
+  function span(vals){ return {min:Math.min.apply(null,vals), max:Math.max.apply(null,vals)}; }
+  function vals(g){ return P.map(g).filter(function(x){return x!=null}); }
+  var dR =span(vals(function(p){return p.decade})),
+      pR =span(vals(function(p){return priceOf(p)||null})),
+      lR =span(vals(function(p){return p.land})),
+      flR=span(vals(function(p){return p.floor})),
+      bR =span(vals(function(p){return p.beds}));
+  function setup(id, min, max, step, def){
+    var s=document.getElementById(id); s.min=min; s.max=max; s.step=step; s.value=def; return s;
+  }
+  setup('fBuilt', dR.min,  dR.max, 10,   dR.min);   /* default = oldest -> no lower bound */
+  setup('fPrice', pR.min,  pR.max, 5000, pR.max);   /* default = dearest -> no upper bound */
+  setup('fLand',  lR.min,  lR.max, 10,   lR.min);
+  setup('fFloor', flR.min, flR.max, 5,   flR.min);
+  setup('fBeds',  bR.min,  bR.max, 1,    bR.min);
+  F.built=dR.min; F.price=pR.max; F.land=lR.min; F.floor=flR.min; F.beds=bR.min;
+
+  function labels(){
+    document.getElementById('vBuilt').textContent = (+document.getElementById('fBuilt').value)+'s';
+    document.getElementById('vPrice').textContent = fmt$(+document.getElementById('fPrice').value);
+    document.getElementById('vLand').textContent  = (+document.getElementById('fLand').value)+' m²';
+    document.getElementById('vFloor').textContent = (+document.getElementById('fFloor').value)+' m²';
+    document.getElementById('vBeds').textContent  = (+document.getElementById('fBeds').value)+'+';
+  }
+  labels();
+  [['fBuilt','built'],['fPrice','price'],['fLand','land'],['fFloor','floor'],['fBeds','beds']].forEach(function(m){
+    document.getElementById(m[0]).addEventListener('input',function(){ F[m[1]]=+this.value; labels(); render(); });
+  });
+
+  var btn=document.getElementById('moreBtn'), panel=document.getElementById('morePanel');
+  btn.addEventListener('click',function(){
+    var willOpen=panel.hidden;
+    panel.hidden=!willOpen;
+    btn.setAttribute('aria-expanded', willOpen?'true':'false');
+  });
+})();
+
+['rank','ref'].forEach(function(id){ document.getElementById(id).addEventListener('change',render); });
+['fFlood','fSlope','fReno'].forEach(function(id){ document.getElementById(id).addEventListener('change',render); });
+render();
+})();
+</script>

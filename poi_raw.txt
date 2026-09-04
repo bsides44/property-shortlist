@@ -1,0 +1,132 @@
+FreshChoice|s|-41.27247|173.28730
+Bobby Franks|c|-41.26934|173.29155
+River Kitchen|c|-41.27023|173.28454
+Infused|c|-41.31254|173.23429
+Stoke Kindergarten|k|-41.31664|173.23406
+Oxford Street Cafe|c|-41.34078|173.18433
+Atomic Coffee Shop|c|-41.27221|173.28713
+Tasty Tucker - Bakery & Cafe|c|-41.27263|173.28300
+Morrison Street Cafe Gallery|c|-41.27449|173.28549
+Cook's Corner|c|-41.27415|173.28268
+The Boathouse Cafe|c|-41.26594|173.26653
+Ake Ake Café|c|-41.27544|173.28867
+McCashin's Tap Room|c|-41.31865|173.22558
+Sweet As Cafe|c|-41.27457|173.28369
+The Coffee Factory|c|-41.32557|173.21259
+Society Coffee Roaster|c|-41.33371|173.20113
+Tern Coffee House|c|-41.27464|173.28307
+Kush Roadster & Micro Café|c|-41.26629|173.27699
+Alberta's|c|-41.25620|173.10150
+East St Cafe|c|-41.27469|173.28281
+Vanilla Bean Café|c|-41.33491|173.17954
+The Grape Escape|c|-41.33540|173.15824
+Nelson Training Centre|c|-41.27241|173.27983
+GoodFor|s|-41.33586|173.15839
+The Baker's Coffee Shop|c|-41.27374|173.28729
+Nook|c|-41.29072|173.24589
+Rabbit Island Coffee Co.|c|-41.25625|173.10147
+The Qualitea Cafe|c|-41.27417|173.28314
+Brews & Bikes|c|-41.30634|173.23235
+The Goods|c|-41.33356|173.16004
+Wayfarer Cafe|c|-41.29928|173.22532
+Sublime Coffee|c|-41.29931|173.22561
+Victus Coffee & Eatery|c|-41.27244|173.28554
+The Suter Café|c|-41.27302|173.29002
+Waimea Kindergarten|k|-41.34226|173.19612
+Hardy St Eatery|c|-41.27438|173.28240
+Atawhai Kids Preschool|k|-41.24199|173.32340
+Teaology|c|-41.27418|173.28307
+Sublime Coffee Roasters|c|-41.27187|173.28639
+CJ Asian Supermarket|s|-41.27390|173.28300
+The Indian Café|c|-41.33856|173.18421
+The Indian Café|c|-41.31241|173.23219
+Tāhuna Breakfast Club|c|-41.28208|173.24939
+Lydia's Café|c|-41.33848|173.18348
+Halifax Cafe|c|-41.27094|173.28310
+Asian Food Store|s|-41.27381|173.28190
+Coffee On Queen Beached|c|-41.28270|173.24625
+SaveMore|s|-41.27140|173.28254
+Dabang Coffee|c|-41.27221|173.28413
+Broccoli Row Café|c|-41.27497|173.28649
+Prego|s|-41.27312|173.28676
+91 on Nile|c|-41.27619|173.28948
+Saed's Falafel|c|-41.27242|173.28535
+Viva la Vaca|c|-41.27227|173.28536
+Atom Café|c|-41.27585|173.28240
+Dhara's Cafe|c|-41.27390|173.28537
+Sublime Coffee Roasters|c|-41.26531|173.27227
+Kitesurf Nelson|c|-41.28027|173.25044
+Bridge Street Kindergarten|k|-41.27227|173.28961
+Someday Somewhere|c|-41.27251|173.28842
+Nelson Montessori|k|-41.26155|173.29730
+Melrose Cafe|c|-41.28218|173.28436
+Blink Micro Cafe|c|-41.27337|173.28364
+Wucha|c|-41.27420|173.28415
+Porta Via|c|-41.27444|173.28472
+Yaza! Cafe|c|-41.27382|173.28212
+Back Alley Cafe|c|-41.27489|173.28233
+Greenmeadows Cafe|c|-41.31322|173.23429
+Yogiji's Food Mart|s|-41.27188|173.28663
+Shelstar Coffee|c|-41.27777|173.27506
+Marsden Valley Café|c|-41.32159|173.25750
+Rutherford Street Kindergarten|k|-41.28026|173.28085
+Busy Bees Hardy Street|k|-41.27494|173.29650
+Busy Bees Stoke|k|-41.31830|173.21630
+Busy Bees Tahunanui|k|-41.28989|173.24556
+Nelson College for Girls|s|-41.27895|173.28217
+Nelson College|s|-41.28644|173.27711
+St Joseph's School|s|-41.27912|173.28811
+Nelson Central School|s|-41.27731|173.28882
+Victory Primary School|s|-41.28349|173.26863
+Nelson Intermediate School|s|-41.28838|173.26760
+Auckland Point School|s|-41.26792|173.27718
+Hampden Street School|s|-41.28408|173.27789
+Woolworths|s|-41.27017|173.28161
+Clifton Terrace School|s|-41.22500|173.32234
+Henley School|s|-41.34095|173.19646
+Waimea College|s|-41.33881|173.19800
+Waimea Intermediate School|s|-41.33952|173.19506
+Birchwood School|s|-41.30645|173.22477
+Richmond School|s|-41.33909|173.18138
+New World|s|-41.27572|173.27823
+New World|s|-41.31263|173.23277
+Enner Glynn School|s|-41.30554|173.25374
+Nayland College|s|-41.30396|173.23022
+Woolworths|s|-41.27291|173.27755
+Broadgreen Intermediate School|s|-41.30649|173.23319
+Appleby School|s|-41.30738|173.12030
+Little Dove Cafe|c|-41.26999|173.28685
+Salisbury School|s|-41.33592|173.19368
+Nayland Primary School|s|-41.30774|173.23220
+Stoke School|s|-41.31670|173.23137
+Garin College|s|-41.33496|173.20578
+St Paul's Catholic School|s|-41.33735|173.19381
+Tāhunanui School|s|-41.28648|173.24601
+OneSchool Global Nelson|s|-41.32459|173.18021
+Woolworths|s|-41.31186|173.23457
+Founders Café|c|-41.26151|173.29636
+Hira School|s|-41.21655|173.39491
+Hope School|s|-41.36896|173.14508
+Active Explorers|k|-41.33272|173.20167
+Beach Cafe|c|-41.27997|173.24465
+Pic's Peanut Butter World|c|-41.32283|173.21486
+Te Kura Kaupapa Maori o Tuia te Matangi|s|-41.33530|173.19089
+Ranzau School|s|-41.34846|173.14924
+Nelson Christian Academy|s|-41.31636|173.24472
+Maitai School|s|-41.27348|173.29210
+Refresh Café|c|-41.33076|173.17472
+BestStart Berryfields Crossing|k|-41.33254|173.17437
+Alioke Eatery|c|-41.33454|173.16531
+Pomeroy's Coffee and Tea Company|c|-41.27373|173.28338
+Hattie's Cafe|c|-41.27138|173.28196
+Wata - Coffee & Eatery|c|-41.27326|173.28341
+Boat Shed Cafe|c|-41.26673|173.26547
+Woolworths|s|-41.33478|173.20263
+Gloria Jean's|c|-41.33959|173.18577
+PAK'nSAVE|s|-41.33859|173.18675
+Muffin Break|c|-41.33916|173.18640
+Ginger|c|-41.33928|173.18678
+Ambrosia Cafe|c|-41.33983|173.18563
+Tank|c|-41.33977|173.18575
+Woolworths|s|-41.29858|173.24113
+Ruby's Espresso|c|-41.26243|173.28221

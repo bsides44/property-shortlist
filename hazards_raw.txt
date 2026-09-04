@@ -1,0 +1,23 @@
+6114065395 :: river2020=Maitai - Brook - York/2020/1AEP/Tonkin + Taylor/>20 - 50cm || river2130=Maitai - Brook - York/2130/>20 - 50cm/Tonkin + Taylor || liqA=Liquefaction Damage is Unlikely
+6104877044 :: liqA=Liquefaction Damage is Possible
+5532971914 :: liqA=Liquefaction Damage is Unlikely
+6104541481 :: liqA=Liquefaction Damage is Unlikely
+6079187008 :: liqA=Very Low Liquefaction Vulnerability
+5930848760 :: liqA=Very Low Liquefaction Vulnerability || slopeII=Slope Instability - Tier II
+6101420908 :: liqA=Very Low Liquefaction Vulnerability
+6012638172 :: river2130=Maitai - Brook - York/2130/>5 - 20cm/Tonkin + Taylor || coast2130=2130 - SSP5 - 8.5M - 1% AEP/Nelson CBD/>20 - 50cm || liqA=Liquefaction Damage is Possible
+5888774859 :: river2130=Maitai - Brook - York/2130/>20 - 50cm/Tonkin + Taylor || liqA=Liquefaction Damage is Possible
+5750958235 :: liqA=Very Low Liquefaction Vulnerability || slopeIII=Slope Instability - Tier III
+6077521522 :: liqA=Liquefaction Damage is Possible
+6031028205 :: liqA=Very Low Liquefaction Vulnerability || slopeIII=Slope Instability - Tier III
+5906761703 :: liqA=Very Low Liquefaction Vulnerability || slopeIII=Slope Instability - Tier III
+5941032933 :: coast2130=2130 - SSP5 - 8.5M - 1% AEP/Nelson Haven/>50cm - 1m || liqA=Liquefaction Damage is Possible
+5788310112 :: liqA=Liquefaction Damage is Possible
+5766783417 :: liqA=Liquefaction Damage is Unlikely
+5920402562 :: liqA=Very Low Liquefaction Vulnerability
+5969731326 :: liqA=Very Low Liquefaction Vulnerability || slopeIII=Slope Instability - Tier III
+6064875981 :: coast2130=2130 - SSP5 - 8.5M - 1% AEP/Tāhunanui/0 - 20cm || liqA=Liquefaction Damage is Possible || liqB=Medium Liquefaction Vulnerability
+6064828779 :: liqA=Very Low Liquefaction Vulnerability || slopeIII=Slope Instability - Tier III
+5959828752 :: liqA=Very Low Liquefaction Vulnerability
+6010957811 :: river2020=Maitai - Brook - York/2020/1AEP/Tonkin + Taylor/>1 - 2m || river2130=Maitai - Brook - York/2130/>1 - 2m/Tonkin + Taylor || liqA=Liquefaction Damage is Possible
+5782013688 :: OUTSIDE_COVERAGE
