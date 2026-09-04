@@ -29,6 +29,11 @@ RE_DISTRICT   = 271
 MIN_BEDS      = 3
 MIN_FLOOR     = 120                       # m^2
 MIN_LAND      = 250                       # m^2
+# keep the map readable: only listings within RADIUS_KM of Tahunanui. This also
+# drops the odd mis-tagged listing (e.g. a Bishopdale, Christchurch address that
+# comes back under the Nelson district).
+CENTRE        = (-41.2930, 173.2440)      # Tahunanui, Nelson (lat, lon)
+RADIUS_KM     = 15
 MAX_NEW_PER_RUN = int(os.environ.get("CRAWL_MAX_NEW", "40"))   # enrichments per run
 PRUNE_MIN_DISCOVERED = 20                 # only drop "gone" listings if discovery looked healthy
 REQUEST_DELAY = float(os.environ.get("CRAWL_HOMES_DELAY", "1.0"))  # seconds between homes.co.nz requests
@@ -352,10 +357,18 @@ def discover():
         time.sleep(1.0)
     return out
 
+def km_from(lat, lon, centre=CENTRE):
+    R = 6371.0
+    dlat = math.radians(lat - centre[0]); dlon = math.radians(lon - centre[1])
+    a = (math.sin(dlat / 2) ** 2 +
+         math.cos(math.radians(centre[0])) * math.cos(math.radians(lat)) * math.sin(dlon / 2) ** 2)
+    return 2 * R * math.asin(math.sqrt(a))
+
 def qualifies(p):
     if p["beds"] is None or p["beds"] < MIN_BEDS:   return False
     if p["floor"] is None or p["floor"] < MIN_FLOOR: return False
     if p["land"] is None or p["land"] < MIN_LAND:   return False
+    if km_from(p["lat"], p["lon"]) > RADIUS_KM:     return False
     return True
 
 def enrich(p):
