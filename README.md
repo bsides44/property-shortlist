@@ -22,6 +22,7 @@ fully self-contained — all data and map geometry are embedded, no server neede
 | `crawl.py` | **The engine.** Discovers Nelson listings via realestate.co.nz's search API and enriches each (hazards + homes.co.nz + description scan) into `data.json`. |
 | `build_html.py` | Injects `data.json` + `geo.json` into the template → `nelson_shortlist.html` + `index.html`. |
 | `.github/workflows/update.yml` | Daily cron that runs the two scripts and commits the result. |
+| `requirements.txt` | Python deps for the BRANZ zone lookup only (`mapbox-vector-tile`, `shapely`, `pyproj`); the rest of the crawl is stdlib. |
 | `app_template.html` | App source. Contains `__DATA__`, `__GEO__` and `__SRC__` placeholders. |
 | `nelson_shortlist.html` / `index.html` | The built, self-contained app (identical; `index.html` is for Pages). |
 | `data.json` | Live properties + POIs. Rewritten by `crawl.py` each run. |
@@ -160,6 +161,27 @@ is why the app ships precomputed per-property results rather than drawing the fl
 Overpass API, `POST https://overpass-api.de/api/interpreter`. Schools are classified by
 name, since NZ schools rarely carry `isced:level`: "College" → secondary, "Intermediate" →
 intermediate, otherwise primary. Exceptions are hardcoded in `build.py` (`FIXES`).
+
+### 5. Wind + corrosion zones — BRANZ Map (vector tiles)
+
+Each property's **wind zone** (NZS 3604: Low → Extra High) and **coastal corrosion zone**
+(B / C / D) come from the [BRANZ Map](https://experience.arcgis.com/experience/6e83b0bb19d14a0db411aebdc301cf49).
+BRANZ offers no public point-query API — its "Property Information" layer is access-restricted,
+and the zones are published only as **display vector tiles**. So `crawl.py` reads them the hard way:
+
+- The tiles use a **NZTM (EPSG:2193)** tiling scheme (origin `-4020900, 19998100`, 512px tiles),
+  not Web Mercator — so the point is projected to 2193 and the tile row/col computed from the
+  service's own LOD resolutions (`?f=json` → `tileInfo`).
+- Tiles are **gzip-encoded** `.pbf`; decode with `gzip` then `mapbox_vector_tile`.
+- Each feature carries only a `_symbol` index; the label comes from the layer's
+  `resources/styles/root.json` (e.g. Wind `_symbol` 0–5 → Low…Extra High; Corrosion 0–2 → Zone B/C/D).
+- The zones tile all land contiguously, so the property's zone is the polygon that **contains**
+  the point, or the **nearest** polygon if simplification leaves a gap. A coarse level (12) means a
+  handful of cached tiles cover all of Nelson.
+
+This is the only part of the pipeline needing third-party libraries (`requirements.txt`:
+`mapbox-vector-tile`, `shapely`, `pyproj`). If they're absent the crawl still runs and leaves the
+zones blank.
 
 ---
 

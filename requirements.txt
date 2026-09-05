@@ -1,0 +1,7 @@
+# Crawler dependencies. The core crawl (realestate.co.nz + council hazards +
+# homes.co.nz) uses only the Python standard library; these are needed only for
+# the BRANZ wind/corrosion zone lookup, which reads BRANZ's NZTM vector tiles.
+# If they are missing the crawl still runs and simply leaves the zones blank.
+mapbox-vector-tile>=2.0.1
+shapely>=2.0.0
+pyproj>=3.4.0

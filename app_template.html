@@ -291,7 +291,7 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
           <input type="range" id="fBuilt">
         </div>
         <div class="field">
-          <label class="slabel" for="fPrice">Under asking price / CV <b id="vPrice"></b></label>
+          <label class="slabel" for="fPrice">Under asking price <b id="vPrice"></b></label>
           <input type="range" id="fPrice">
         </div>
         <div class="field">
@@ -305,6 +305,22 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
         <div class="field">
           <label class="slabel" for="fBeds">Min bedrooms <b id="vBeds"></b></label>
           <input type="range" id="fBeds">
+        </div>
+        <div class="field">
+          <label class="slabel" for="fSlopeMax">Max slope risk <b id="vSlope"></b></label>
+          <input type="range" id="fSlopeMax">
+        </div>
+        <div class="field">
+          <label class="slabel" for="fLiq">Max liquefaction <b id="vLiq"></b></label>
+          <input type="range" id="fLiq">
+        </div>
+        <div class="field">
+          <label class="slabel" for="fWind">Max wind zone <b id="vWind"></b></label>
+          <input type="range" id="fWind">
+        </div>
+        <div class="field">
+          <label class="slabel" for="fCorr">Max corrosion <b id="vCorr"></b></label>
+          <input type="range" id="fCorr">
         </div>
       </div>
     </div>
@@ -348,6 +364,7 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
       <h3>Where the numbers come from</h3>
       <p><b>Hazards</b> are point-in-polygon queries against Nelson City Council's published hazard services — river flood depth (present day and 2130), coastal flood depth, wave run-up, coastal erosion, liquefaction, slope instability tiers, and the fault deformation overlay. Depth bands and probabilities are the council's own wording.</p>
       <p><b>Decade built and capital value</b> come from council rating records via homes.co.nz. <b>Beds, baths, floor and land area, price and description</b> are as advertised on realestate.co.nz.</p>
+      <p><b>Wind zone and corrosion zone</b> are from the <a href="https://experience.arcgis.com/experience/6e83b0bb19d14a0db411aebdc301cf49/page/Page" target="_blank" rel="noopener">BRANZ Map</a> — the NZS 3604 wind zone (Low to Extra High, driving bracing requirements) and the coastal corrosion/sea-spray zone (Lowest, Moderate or Highest, affecting material durability near the sea). Indicative only; a site-specific assessment is higher resolution.</p>
       <p><b>Distances</b> are straight-line to OpenStreetMap points, not walking or driving time.</p>
     </div>
     <div>
@@ -374,7 +391,8 @@ var DATA = JSON.parse(document.getElementById('data').textContent);
 var GEO  = JSON.parse(document.getElementById('geo').textContent);
 var P = DATA.properties, POIS = DATA.pois;
 var hidden = {};                       /* property ids manually un-ticked in the list (removed from map) */
-var F = {built:null, price:null, land:null, floor:null, beds:null};  /* "more filters" thresholds */
+var F = {built:null, price:null, land:null, floor:null, beds:null,
+         slope:null, liq:null, wind:null, corr:null};  /* "more filters" thresholds */
 
 /* ---------- severity ---------- */
 function severity(p){
@@ -634,6 +652,8 @@ var openId=null;
 function priceOf(p){ return p.ask || p.cv || 0; }
 function fmt$(n){ return n ? '$'+n.toLocaleString('en-NZ') : '—'; }
 function dec(p){ return p.decade ? p.decade+'s' : '—'; }
+/* BRANZ corrosion zone B/C/D shown in plainer terms */
+function corrZone(p){ return {'Zone B':'Lowest','Zone C':'Moderate','Zone D':'Highest'}[p.corrosionZone] || (p.corrosionZone||'—'); }
 
 /* ---------- listing-description feature scan ----------
    Each property's `reno` / `dblGlaz` flags come from scanning its realestate.co.nz
@@ -656,6 +676,26 @@ function hasFeature(p){ return !!(p.reno||p.dblGlaz); }
 /* a 2130 flood/coastal projection, as opposed to a present-day flood hazard */
 function isFuture(h){ return (h.kind==='flood'||h.kind==='coastal') && /2130/.test(h.scenario||''); }
 
+/* ---- ordinal levels for the wind / corrosion / slope / liquefaction filters + chips ---- */
+var WIND_ORD={'Low':0,'Medium':1,'High':2,'Very High':3,'Extra High':4,'Specific Engineering Design':5};
+var WIND_LBL=['Low','Medium','High','Very High','Extra High','SED'];
+var CORR_ORD={'Zone B':0,'Zone C':1,'Zone D':2};
+var CORR_LBL=['Lowest','Moderate','Highest'];
+var SLOPE_LBL=['None','Tier 1','Tier 2','Tier 3'];   /* ascending: Tier 3 = highest slope risk (council "Tier I") */
+var LIQ_LBL=['None','Possible','Likely'];
+function windLevel(p){ var v=WIND_ORD[p.windZone]; return v==null?0:v; }
+function corrLevel(p){ var v=CORR_ORD[p.corrosionZone]; return v==null?0:v; }
+function slopeLevel(p){   /* 0 none, 1 Tier 3 (lowest), 2 Tier 2 / run-out, 3 Tier 1 (highest) */
+  var m=0; (p.hazards||[]).forEach(function(h){
+    if(h.kind==='slope'){ var lv={slopeI:3,slopeII:2,slopeRunout:2,slopeIII:1}[h.key]||0; if(lv>m)m=lv; } });
+  return m;
+}
+function liqLevel(p){
+  var m=0; (p.hazards||[]).forEach(function(h){
+    if(h.kind==='ground'){ var lv=h.rank>=3?2:(h.rank>0?1:0); if(lv>m)m=lv; } });
+  return m;
+}
+
 /* every property shown in the list (and eligible for the map) must clear these */
 function passesFilters(p){
   var q=(document.getElementById('search').value||'').trim().toLowerCase();
@@ -671,6 +711,10 @@ function passesFilters(p){
   if(F.land!=null  && p.land!=null  && p.land  < F.land)    return false;
   if(F.floor!=null && p.floor!=null && p.floor < F.floor)   return false;
   if(F.beds!=null  && p.beds!=null  && p.beds  < F.beds)    return false;
+  if(F.slope!=null && slopeLevel(p) > F.slope)              return false;
+  if(F.liq!=null   && liqLevel(p)   > F.liq)                return false;
+  if(F.wind!=null  && windLevel(p)  > F.wind)               return false;
+  if(F.corr!=null  && corrLevel(p)  > F.corr)               return false;
   return true;
 }
 
@@ -740,6 +784,8 @@ function detailHTML(p){
     + '<div><dt>Last sale</dt><dd>'+fmt$(p.lastSale)+(p.lastSaleDate?' <span style="color:var(--muted)">'+p.lastSaleDate.slice(0,4)+'</span>':'')+'</dd></div>'
     + '<div><dt>Beds / baths</dt><dd>'+p.beds+' / '+p.baths+'</dd></div>'
     + '<div><dt>Floor / land</dt><dd>'+p.floor+' / '+p.land+' m²</dd></div>'
+    + '<div><dt>Wind zone <span style="text-transform:none;letter-spacing:0">(BRANZ)</span></dt><dd>'+(p.windZone||'—')+'</dd></div>'
+    + '<div><dt>Corrosion zone <span style="text-transform:none;letter-spacing:0">(BRANZ)</span></dt><dd>'+corrZone(p)+'</dd></div>'
     + '<div><dt>Listed</dt><dd>'+p.listed+'</dd></div>'
     + '<div><dt>Description scan</dt><dd style="font-size:12px">'+(
         !p.descScanned ? '<span style="color:var(--muted)">no public description found</span>'
@@ -752,6 +798,7 @@ function detailHTML(p){
     + '<div class="nearest"><h4>Nearest of each kind</h4><ul>'+near+'</ul></div>'
     + '<div class="acts"><a href="'+p.url+'" target="_blank" rel="noopener">View listing ↗</a>'
     + '<a href="https://experience.arcgis.com/experience/188c8d0a60d344ccbd80f8aa71c75184/page/River-Flooding" target="_blank" rel="noopener">Council hazard viewer ↗</a>'
+    + '<a href="https://experience.arcgis.com/experience/6e83b0bb19d14a0db411aebdc301cf49/page/Page" target="_blank" rel="noopener">BRANZ zones ↗</a>'
     + '<span style="color:var(--muted);font-family:IBM Plex Mono,monospace;font-size:12px">'+p.lat.toFixed(5)+', '+p.lon.toFixed(5)+'</span></div>'
     + '</div>';
 }
@@ -777,7 +824,12 @@ function render(){
     var fchips=(p.dblGlaz?'<span class="chip feat">Double glazed</span>':'')
              +(p.reno?'<span class="chip feat">Renovated</span>':'')
              +(!p.descScanned?'<span class="chip plain">No reno info found</span>':'');
-    var chips=chipsFor(p).map(function(c){return '<span class="chip '+c[0]+'">'+c[1]+'</span>'}).join('')+fchips;
+    var wl=windLevel(p), cl=corrLevel(p);   /* BRANZ zone chips: wind High+, corrosion Highest */
+    var zchips=(wl>=2?'<span class="chip '+(wl>=3?'high':'watch')+'">'+WIND_LBL[wl]+' wind</span>':'')
+             +(cl>=2?'<span class="chip high">'+CORR_LBL[cl]+' corrosion</span>':'');
+    var hz=chipsFor(p);
+    if((wl>=2||cl>=2) && hz.length===1 && hz[0][0]==='ok') hz=[];   /* high wind / highest corrosion counts as a flag, so drop "Nothing flagged" */
+    var chips=hz.map(function(c){return '<span class="chip '+c[0]+'">'+c[1]+'</span>'}).join('')+zchips+fchips;
     li.innerHTML='<span class="rank"><input type="checkbox" class="mapchk" '+(hidden[p.id]?'':'checked')+' aria-label="Show this property on the map">'+(i+1)+'</span>'
       +'<span class="addr">'+p.address.replace(/, Nelson$/,'')+'</span>'
       +'<span class="metric"><b>'+m[0]+'</b><span>'+m[1]+'</span>'+(m[2]?'<span class="walk">'+m[2]+'</span>':'')+'</span>'
@@ -857,6 +909,14 @@ function select(id, scroll){
   setup('fFloor', flR.min, flR.max, 5,   flR.min);
   setup('fBeds',  bR.min,  bR.max, 1,    bR.min);
   F.built=dR.min; F.price=pR.max; F.land=lR.min; F.floor=flR.min; F.beds=bR.min;
+  /* ordinal risk/zone sliders on the full scale; top position = "Any" (no filter, the default) */
+  var slM=SLOPE_LBL.length-1, lqM=LIQ_LBL.length-1, wnM=WIND_LBL.length-1, crM=CORR_LBL.length-1;
+  setup('fSlopeMax', 0, slM, 1, slM);
+  setup('fLiq',   0, lqM, 1, lqM);
+  setup('fWind',  0, wnM, 1, wnM);
+  setup('fCorr',  0, crM, 1, crM);
+  F.slope=slM; F.liq=lqM; F.wind=wnM; F.corr=crM;
+  function ordLbl(id, LBL){ return LBL[+document.getElementById(id).value]||LBL[LBL.length-1]; }
 
   function labels(){
     document.getElementById('vBuilt').textContent = (+document.getElementById('fBuilt').value)+'s';
@@ -864,9 +924,14 @@ function select(id, scroll){
     document.getElementById('vLand').textContent  = (+document.getElementById('fLand').value)+' m²';
     document.getElementById('vFloor').textContent = (+document.getElementById('fFloor').value)+' m²';
     document.getElementById('vBeds').textContent  = (+document.getElementById('fBeds').value)+'+';
+    document.getElementById('vSlope').textContent = ordLbl('fSlopeMax', SLOPE_LBL);
+    document.getElementById('vLiq').textContent   = ordLbl('fLiq',   LIQ_LBL);
+    document.getElementById('vWind').textContent  = ordLbl('fWind',  WIND_LBL);
+    document.getElementById('vCorr').textContent  = ordLbl('fCorr',  CORR_LBL);
   }
   labels();
-  [['fBuilt','built'],['fPrice','price'],['fLand','land'],['fFloor','floor'],['fBeds','beds']].forEach(function(m){
+  [['fBuilt','built'],['fPrice','price'],['fLand','land'],['fFloor','floor'],['fBeds','beds'],
+   ['fSlopeMax','slope'],['fLiq','liq'],['fWind','wind'],['fCorr','corr']].forEach(function(m){
     document.getElementById(m[0]).addEventListener('input',function(){ F[m[1]]=+this.value; labels(); render(); });
   });
 

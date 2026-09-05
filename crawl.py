@@ -191,6 +191,86 @@ def query_hazards(lat, lon):
             hazards.append(make_hazard(key, got[min(got)]))
     return {"outsideCoverage": False, "hazards": hazards}
 
+# ---------------------------------------------------------------- BRANZ building zones
+# Per-property wind zone + coastal corrosion zone from the BRANZ Map. BRANZ has no
+# public point-query API: the zones are published only as display vector tiles in a
+# NZTM (EPSG:2193) tiling scheme, gzip-encoded, with the class stored as a `_symbol`
+# index resolved against the layer's style. We read the tile that covers the point,
+# find the containing (or nearest) polygon and map its symbol to a label. Tiles are
+# cached per run; a coarse zoom means a handful of tiles cover all of Nelson.
+try:
+    import gzip as _gzip
+    import mapbox_vector_tile as _mvt
+    from shapely.geometry import shape as _shape, Point as _Point
+    from pyproj import Transformer as _Transformer
+    _TO_NZTM = _Transformer.from_crs(4326, 2193, always_xy=True)
+    _BRANZ_OK = True
+except Exception as _e:
+    _BRANZ_OK = False
+
+_BR_OX, _BR_OY, _BR_TS = -4020900, 19998100, 512      # NZTM tiling origin + tile size
+_BR_RES = [78271.51696399967]
+for _i in range(1, 20):
+    _BR_RES.append(_BR_RES[-1] / 2)
+BRANZ_LEVEL = 12                                       # one level-12 tile ~9.8km; a few cover Nelson
+WIND_LABEL = {0: "Low", 1: "Medium", 2: "High", 3: "Very High",
+              4: "Extra High", 5: "Specific Engineering Design"}
+CORR_LABEL = {0: "Zone B", 1: "Zone C", 2: "Zone D"}
+_branz_tiles = {}
+
+def _branz_tile(svc, row, col):
+    key = (svc, row, col)
+    if key in _branz_tiles:
+        return _branz_tiles[key]
+    url = ("https://tiles.arcgis.com/tiles/vkPf8weODt71Prmb/arcgis/rest/services/"
+           + svc + "/VectorTileServer/tile/" + str(BRANZ_LEVEL) + "/" + str(row) + "/" + str(col) + ".pbf")
+    dec = None
+    try:
+        raw = urllib.request.urlopen(
+            urllib.request.Request(url, headers={"User-Agent": UA}), timeout=25).read()
+        if raw[:2] == b"\x1f\x8b":
+            raw = _gzip.decompress(raw)
+        if raw:
+            dec = _mvt.decode(raw)
+        log("GET tiles.arcgis.com branz", svc, BRANZ_LEVEL, row, col)
+    except Exception as e:
+        log("ERR tiles.arcgis.com branz", str(e)[:60])
+    _branz_tiles[key] = dec
+    return dec
+
+def _branz_symbol(svc, lat, lon):
+    res = _BR_RES[BRANZ_LEVEL]; span = res * _BR_TS
+    X, Y = _TO_NZTM.transform(lon, lat)
+    col = int((X - _BR_OX) // span); row = int((_BR_OY - Y) // span)
+    dec = _branz_tile(svc, row, col)
+    if not dec:
+        return None
+    tminx = _BR_OX + col * span; tmaxy = _BR_OY - row * span
+    fx = (X - tminx) / span; fy = (tmaxy - Y) / span
+    best, bestd = None, 1e18
+    for ln, lay in dec.items():
+        ext = lay["extent"]; pt = _Point(fx * ext, (1 - fy) * ext)
+        for f in lay["features"]:
+            try:
+                g = _shape(f["geometry"])
+                if g.contains(pt):
+                    return f["properties"].get("_symbol")   # BRANZ zones tile all land,
+                d = g.distance(pt)                           # so nearest polygon is the zone
+                if d < bestd:
+                    bestd, best = d, f["properties"].get("_symbol")
+            except Exception:
+                pass
+    return best
+
+def branz_zones(lat, lon):
+    if not _BRANZ_OK:
+        return {"windZone": None, "corrosionZone": None}
+    try:
+        return {"windZone": WIND_LABEL.get(_branz_symbol("Wind_Zones", lat, lon)),
+                "corrosionZone": CORR_LABEL.get(_branz_symbol("Corrosion_Zones", lat, lon))}
+    except Exception:
+        return {"windZone": None, "corrosionZone": None}
+
 # ---------------------------------------------------------------- feature scan
 GLAZ_TERMS = ["double glaz", "double-glaz", "double glazed"]
 # COMPLETED-tense wording only: "renovated", not the "renovate"/"renovation" stem, so
@@ -386,6 +466,8 @@ def enrich(p):
     p.setdefault("cv", None); p.setdefault("landValue", None); p.setdefault("improvValue", None)
     p.setdefault("lastSale", None); p.setdefault("lastSaleDate", None)
 
+    p.update(branz_zones(p["lat"], p["lon"]))   # BRANZ wind + corrosion zones
+
     reno, glaz, ev = scan_description(p.pop("_desc", ""))
     p["reno"], p["dblGlaz"], p["featEvidence"] = reno, glaz, ev
     p["descScanned"] = True
@@ -451,6 +533,16 @@ def main():
     else:
         log("discovery too small (%d) - skipping prune this run" % len(disc_set))
     skipped = len(candidates) - len(qualifying)
+
+    # backfill BRANZ zones for any property that lacks them (cheap: tiles are cached)
+    branz_filled = 0
+    for p in props.values():
+        if p.get("windZone") is None and p.get("corrosionZone") is None:
+            p.update(branz_zones(p["lat"], p["lon"]))
+            if p.get("windZone") or p.get("corrosionZone"):
+                branz_filled += 1
+    if branz_filled:
+        log("BRANZ zones filled for", branz_filled, "properties")
 
     save_state(state, props)
     log("DONE. added=%d removed=%d skipped=%d failed=%d total=%d"
