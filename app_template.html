@@ -322,6 +322,10 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
           <label class="slabel" for="fCorr">Max corrosion <b id="vCorr"></b></label>
           <input type="range" id="fCorr">
         </div>
+        <div class="field">
+          <label class="slabel" for="fFault">Max fault risk <b id="vFault"></b></label>
+          <input type="range" id="fFault">
+        </div>
       </div>
     </div>
   </div>
@@ -392,7 +396,7 @@ var GEO  = JSON.parse(document.getElementById('geo').textContent);
 var P = DATA.properties, POIS = DATA.pois;
 var hidden = {};                       /* property ids manually un-ticked in the list (removed from map) */
 var F = {built:null, price:null, land:null, floor:null, beds:null,
-         slope:null, liq:null, wind:null, corr:null};  /* "more filters" thresholds */
+         slope:null, liq:null, wind:null, corr:null, fault:null};  /* "more filters" thresholds */
 
 /* ---------- severity ---------- */
 function severity(p){
@@ -683,6 +687,8 @@ var CORR_ORD={'Zone B':0,'Zone C':1,'Zone D':2};
 var CORR_LBL=['Lowest','Moderate','Highest'];
 var SLOPE_LBL=['None','Tier 1','Tier 2','Tier 3'];   /* ascending: Tier 3 = highest slope risk (council "Tier I") */
 var LIQ_LBL=['None','Possible','Likely'];
+var FAULT_LBL=['None','Fault line'];
+function faultLevel(p){ return (p.hazards||[]).some(function(h){return h.kind==='fault'&&h.rank>0})?1:0; }
 function windLevel(p){ var v=WIND_ORD[p.windZone]; return v==null?0:v; }
 function corrLevel(p){ var v=CORR_ORD[p.corrosionZone]; return v==null?0:v; }
 function slopeLevel(p){   /* 0 none, 1 Tier 3 (lowest), 2 Tier 2 / run-out, 3 Tier 1 (highest) */
@@ -715,6 +721,7 @@ function passesFilters(p){
   if(F.liq!=null   && liqLevel(p)   > F.liq)                return false;
   if(F.wind!=null  && windLevel(p)  > F.wind)               return false;
   if(F.corr!=null  && corrLevel(p)  > F.corr)               return false;
+  if(F.fault!=null && faultLevel(p) > F.fault)              return false;
   return true;
 }
 
@@ -910,12 +917,13 @@ function select(id, scroll){
   setup('fBeds',  bR.min,  bR.max, 1,    bR.min);
   F.built=dR.min; F.price=pR.max; F.land=lR.min; F.floor=flR.min; F.beds=bR.min;
   /* ordinal risk/zone sliders on the full scale; top position = "Any" (no filter, the default) */
-  var slM=SLOPE_LBL.length-1, lqM=LIQ_LBL.length-1, wnM=WIND_LBL.length-1, crM=CORR_LBL.length-1;
+  var slM=SLOPE_LBL.length-1, lqM=LIQ_LBL.length-1, wnM=WIND_LBL.length-1, crM=CORR_LBL.length-1, ftM=FAULT_LBL.length-1;
   setup('fSlopeMax', 0, slM, 1, slM);
   setup('fLiq',   0, lqM, 1, lqM);
   setup('fWind',  0, wnM, 1, wnM);
   setup('fCorr',  0, crM, 1, crM);
-  F.slope=slM; F.liq=lqM; F.wind=wnM; F.corr=crM;
+  setup('fFault', 0, ftM, 1, ftM);
+  F.slope=slM; F.liq=lqM; F.wind=wnM; F.corr=crM; F.fault=ftM;
   function ordLbl(id, LBL){ return LBL[+document.getElementById(id).value]||LBL[LBL.length-1]; }
 
   function labels(){
@@ -928,10 +936,11 @@ function select(id, scroll){
     document.getElementById('vLiq').textContent   = ordLbl('fLiq',   LIQ_LBL);
     document.getElementById('vWind').textContent  = ordLbl('fWind',  WIND_LBL);
     document.getElementById('vCorr').textContent  = ordLbl('fCorr',  CORR_LBL);
+    document.getElementById('vFault').textContent = ordLbl('fFault', FAULT_LBL);
   }
   labels();
   [['fBuilt','built'],['fPrice','price'],['fLand','land'],['fFloor','floor'],['fBeds','beds'],
-   ['fSlopeMax','slope'],['fLiq','liq'],['fWind','wind'],['fCorr','corr']].forEach(function(m){
+   ['fSlopeMax','slope'],['fLiq','liq'],['fWind','wind'],['fCorr','corr'],['fFault','fault']].forEach(function(m){
     document.getElementById(m[0]).addEventListener('input',function(){ F[m[1]]=+this.value; labels(); render(); });
   });
 

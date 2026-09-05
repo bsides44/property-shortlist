@@ -91,7 +91,7 @@ LAYER_META = {
     "slopeII":     ("Slope instability", "Tier II", "slope"),
     "slopeIII":    ("Slope instability", "Tier III", "slope"),
     "slopeRunout": ("Slope instability", "Run-out zone", "slope"),
-    "fault":       ("Fault deformation", "Fault overlay", "fault"),
+    "fault":       ("Fault line", "Fault rupture zone", "fault"),
 }
 # Liquefaction categories that are not really a flag
 LIQ_BENIGN = ("unlikely", "very low")
