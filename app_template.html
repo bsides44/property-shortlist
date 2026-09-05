@@ -94,7 +94,19 @@ button.ghost[aria-expanded="true"]{border-color:var(--accent);color:var(--accent
 .maphead{display:flex;justify-content:space-between;align-items:baseline;padding:13px 15px 9px}
 .maphead h2{font-family:"Archivo Narrow",sans-serif;text-transform:uppercase;letter-spacing:.11em;font-size:12px;margin:0;color:var(--ink-2)}
 .maphead .scale{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted)}
-svg.map{display:block;width:100%;height:auto}
+.mapview{position:relative}
+svg.map{display:block;width:100%;height:auto;touch-action:none;cursor:grab}
+svg.map.grabbing{cursor:grabbing}
+.zoombtns{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:6px;z-index:2}
+.zoombtns button{
+  width:38px;height:38px;padding:0;font-size:22px;line-height:1;font-family:inherit;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--surface);color:var(--ink);border:1px solid var(--line);
+  border-radius:var(--r);box-shadow:var(--shadow);cursor:pointer;user-select:none;
+}
+.zoombtns button:hover{border-color:var(--accent);color:var(--accent)}
+.zoombtns button:active{background:var(--surface-2)}
+.zoombtns button:disabled{opacity:.4;cursor:default}
 .legend{display:flex;flex-wrap:wrap;gap:9px 16px;padding:11px 15px 14px;border-top:1px solid var(--line-soft);font-size:12.5px;color:var(--ink-2)}
 .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:1px}
 
@@ -198,6 +210,8 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
   .maphead h2{font-size:14px}
   .maphead .scale{font-size:12.5px}
   .legend{font-size:14px;gap:10px 16px}
+  .zoombtns{right:12px;bottom:12px;gap:8px}
+  .zoombtns button{width:48px;height:48px;font-size:28px}
 
   /* list: larger text, roomier rows */
   .listhead h2{font-size:14px}
@@ -297,7 +311,13 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
           <h2>Where they sit</h2>
           <span class="scale" id="scalebar"></span>
         </div>
-        <svg class="map" id="map" viewBox="0 0 460 560" role="img" aria-label="Schematic map of Nelson showing shortlisted properties coloured by hazard exposure"></svg>
+        <div class="mapview">
+          <svg class="map" id="map" viewBox="0 0 460 560" role="img" aria-label="Schematic map of Nelson showing shortlisted properties coloured by hazard exposure"></svg>
+          <div class="zoombtns">
+            <button type="button" id="zin" aria-label="Zoom in">+</button>
+            <button type="button" id="zout" aria-label="Zoom out">&minus;</button>
+          </div>
+        </div>
         <div class="legend">
           <span><i style="background:var(--high)"></i>Flood or multiple flags</span>
           <span><i style="background:var(--watch)"></i>One flag to check</span>
@@ -510,7 +530,7 @@ P.forEach(function(p){
   var c=el('circle',{cx:X(p.lon).toFixed(1),cy:Y(p.lat).toFixed(1),r:5,
     fill:SEVCOL[p.sev],stroke:'var(--surface)','stroke-width':1.5,class:'dot','data-id':p.id});
   c.style.cursor='pointer';
-  c.addEventListener('click',function(){ select(p.id,true); });
+  c.addEventListener('click',function(){ if(suppressClick) return; select(p.id,true); });
   dotG.appendChild(c);
   dots[p.id]=c;
 });
@@ -528,17 +548,77 @@ function updatePlaceMarker(){
   var px=X(place.lon), py=Y(place.lat), pad=9;
   var cx=Math.max(pad,Math.min(VB.w-pad,px)), cy=Math.max(pad,Math.min(VB.h-pad,py));
   var off=Math.abs(cx-px)>0.5||Math.abs(cy-py)>0.5;   /* place sits beyond the map frame */
-  var s=6.5;
+  var k=1/zoomK, s=6.5*k;                              /* keep the marker a constant on-screen size */
   placeMarker.appendChild(el('path',{d:'M'+cx+' '+(cy-s)+'L'+(cx+s)+' '+cy+'L'+cx+' '+(cy+s)+'L'+(cx-s)+' '+cy+'Z',
-    fill:'var(--accent)',stroke:'var(--surface)','stroke-width':1.8,opacity:off?0.65:1}));
+    fill:'var(--accent)',stroke:'var(--surface)','stroke-width':1.8*k,opacity:off?0.65:1}));
   var name=place.n.length>22?place.n.slice(0,21)+'…':place.n;
-  var anchor=cx>VB.w-110?'end':'start', tx=anchor==='end'?cx-10:cx+10;
-  var t=el('text',{x:tx.toFixed(1),y:(cy+3.6).toFixed(1),fill:'var(--accent)','font-size':10.5,
+  var anchor=cx>VB.w-110?'end':'start', tx=anchor==='end'?cx-10*k:cx+10*k;
+  var t=el('text',{x:tx.toFixed(1),y:(cy+3.6*k).toFixed(1),fill:'var(--accent)','font-size':10.5*k,
     'font-family':'Archivo Narrow, sans-serif','font-weight':700,'text-anchor':anchor,
     'style':'text-transform:uppercase;letter-spacing:.05em'});
   t.textContent=name+(off?' (off map ↗)':'');
   placeMarker.appendChild(t);
 }
+
+/* ---------- pan / zoom ---------- */
+var zoomK=1;                                    /* on-screen zoom (1 = full extent) */
+var view={x:0,y:0,w:VB.w,h:VB.h};
+var MINW=VB.w*0.28;                             /* deepest zoom-in (~3.5x) */
+var FULLKM=(b.e-b.w)*111*kx;                     /* geographic width of the default view */
+var suppressClick=false;                        /* set briefly after a drag, so it isn't read as a tap */
+
+function clampView(){
+  view.w=Math.max(MINW,Math.min(VB.w,view.w));
+  view.h=view.w*(VB.h/VB.w);
+  view.x=Math.max(0,Math.min(VB.w-view.w,view.x));
+  view.y=Math.max(0,Math.min(VB.h-view.h,view.y));
+}
+function applyView(){
+  clampView();
+  zoomK=VB.w/view.w;
+  svg.setAttribute('viewBox',view.x.toFixed(2)+' '+view.y.toFixed(2)+' '+view.w.toFixed(2)+' '+view.h.toFixed(2));
+  var across=FULLKM*view.w/VB.w;
+  document.getElementById('scalebar').textContent=(across<10?across.toFixed(1):Math.round(across))+' km across';
+  paintDots();          /* re-size pins so they stay a constant on-screen size */
+  updatePlaceMarker();
+  document.getElementById('zin').disabled = view.w<=MINW+0.5;
+  document.getElementById('zout').disabled = view.w>=VB.w-0.5;
+}
+function zoomAt(cx,cy,factor){
+  var nw=Math.max(MINW,Math.min(VB.w,view.w*factor)), nh=nw*(VB.h/VB.w);
+  view.x+=(cx-view.x)*(1-nw/view.w);
+  view.y+=(cy-view.y)*(1-nh/view.h);
+  view.w=nw; view.h=nh; applyView();
+}
+document.getElementById('zin').addEventListener('click',function(){ zoomAt(view.x+view.w/2,view.y+view.h/2,0.7); });
+document.getElementById('zout').addEventListener('click',function(){ zoomAt(view.x+view.w/2,view.y+view.h/2,1/0.7); });
+
+/* drag to pan — one code path for mouse and touch via Pointer Events */
+var drag=null, panMoved=false;
+function unitsPerPx(){ return view.w/(svg.clientWidth||svg.getBoundingClientRect().width||VB.w); }
+svg.addEventListener('pointerdown',function(e){
+  drag={x:e.clientX,y:e.clientY,vx:view.x,vy:view.y}; panMoved=false;
+  try{ svg.setPointerCapture(e.pointerId); }catch(_){}
+});
+svg.addEventListener('pointermove',function(e){
+  if(!drag) return;
+  if(!panMoved && Math.abs(e.clientX-drag.x)+Math.abs(e.clientY-drag.y)>4){ panMoved=true; svg.classList.add('grabbing'); }
+  if(panMoved){
+    var upp=unitsPerPx();
+    view.x=drag.vx-(e.clientX-drag.x)*upp;
+    view.y=drag.vy-(e.clientY-drag.y)*upp;
+    applyView(); e.preventDefault();
+  }
+});
+function endDrag(e){
+  if(drag){
+    try{ svg.releasePointerCapture(e.pointerId); }catch(_){}
+    if(panMoved){ suppressClick=true; setTimeout(function(){ suppressClick=false; },30); }
+  }
+  drag=null; svg.classList.remove('grabbing');
+}
+svg.addEventListener('pointerup',endDrag);
+svg.addEventListener('pointercancel',endDrag);
 
 /* ---------- rendering ---------- */
 var rowsEl=document.getElementById('rows');
@@ -712,13 +792,14 @@ function render(){
 }
 
 function paintDots(){
+  var s=1/zoomK;   /* counter-scale so pins keep their on-screen size while zoomed */
   P.forEach(function(p){
     var c=dots[p.id];
     var vis = passesFilters(p) && !hidden[p.id];
     c.style.display = vis ? '' : 'none';
     var on = vis && openId===p.id;
-    c.setAttribute('r', on?8:5);
-    c.setAttribute('stroke-width', on?2.5:1.5);
+    c.setAttribute('r', (on?8:5)*s);
+    c.setAttribute('stroke-width', (on?2.5:1.5)*s);
     c.setAttribute('stroke', on?'var(--accent)':'var(--surface)');
   });
 }
@@ -791,5 +872,6 @@ function select(id, scroll){
 ['rank','ref'].forEach(function(id){ document.getElementById(id).addEventListener('change',render); });
 ['fFlood','fSlope','fReno'].forEach(function(id){ document.getElementById(id).addEventListener('change',render); });
 render();
+applyView();   /* initialise zoom state + button enabled/disabled */
 })();
 </script>
