@@ -163,6 +163,67 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
 @media (prefers-reduced-motion:no-preference){
   .dot{transition:r .15s ease, stroke-width .15s ease}
 }
+
+/* ---------- mobile ---------- */
+@media (max-width:640px){
+  body{font-size:16.5px;line-height:1.55}
+  .wrap{padding:0 14px 56px}
+  .hdr{padding:16px 14px;gap:12px}
+  .rail{gap:18px 24px}
+  .stat b{font-size:25px}
+  .stat span{font-size:11.5px}
+  .src{font-size:14px}
+
+  /* controls: full-width, finger-sized targets (min 48px tall) */
+  .controls{flex-direction:column;align-items:stretch;gap:14px;padding:14px 0 16px}
+  .field{width:100%}
+  .field > label{font-size:12px}
+  select,button.ghost{font-size:16px;padding:13px 14px;min-height:48px;width:100%}
+  select{min-width:0}
+  button.ghost{justify-content:center}
+  .toggles{flex-direction:column;gap:10px}
+  .chk{font-size:16px;padding:13px 15px;min-height:48px}
+  .chk input{width:22px;height:22px}
+  .morepanel{grid-template-columns:1fr;padding:16px;gap:20px}
+  .slabel{font-size:12px}
+  .slabel b{font-size:14px}
+  /* bigger, easier-to-drag sliders */
+  .morepanel input[type=range]{-webkit-appearance:none;appearance:none;height:8px;border-radius:4px;background:var(--line);padding:0}
+  .morepanel input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.3)}
+  .morepanel input[type=range]::-moz-range-thumb{width:28px;height:28px;border:2px solid var(--surface);border-radius:50%;background:var(--accent)}
+
+  /* map above the list and scrolling with it, not pinned */
+  .grid{gap:18px}
+  .mapwrap{position:static}
+  .maphead h2{font-size:14px}
+  .maphead .scale{font-size:12.5px}
+  .legend{font-size:14px;gap:10px 16px}
+
+  /* list: larger text, roomier rows */
+  .listhead h2{font-size:14px}
+  .listhead .count{font-size:13px}
+  .row{padding:14px 14px;grid-template-columns:40px minmax(0,1fr) auto;column-gap:12px}
+  .rank{font-size:14px;gap:8px}
+  .rank input{width:26px;height:26px}
+  .addr{font-size:17px}
+  .sub{font-size:14.5px}
+  .metric b{font-size:19px}
+  .metric span{font-size:12px}
+  .metric .walk{font-size:12.5px}
+  .chip{font-size:13px;padding:4px 9px}
+
+  /* detail */
+  .detail dt{font-size:11.5px}
+  .detail dd{font-size:15px}
+  .hz li{display:flex;flex-wrap:wrap;align-items:baseline;gap:3px 10px;font-size:14.5px}
+  .hz .hzname{flex:1 1 auto}
+  .hz .hzval{margin-left:auto;font-size:13.5px}
+  .hz .hzscn{flex-basis:100%;order:3;font-size:13px}
+  .acts{font-size:16px;gap:20px;flex-wrap:wrap}
+  .nearest{font-size:14.5px}
+  .nearest ul{grid-template-columns:1fr}
+  .notes p{font-size:15px}
+}
 </style>
 
 <header>
