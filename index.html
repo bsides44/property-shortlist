@@ -698,11 +698,14 @@ var FAULT_LBL=['None','Fault line'];
 function faultLevel(p){ return (p.hazards||[]).some(function(h){return h.kind==='fault'&&h.rank>0})?1:0; }
 function windLevel(p){ var v=WIND_ORD[p.windZone]; return v==null?0:v; }
 function corrLevel(p){ var v=CORR_ORD[p.corrosionZone]; return v==null?0:v; }
-function slopeLevel(p){   /* 0 none, 1 Tier 3 (lowest), 2 Tier 2 / run-out, 3 Tier 1 (highest) */
+function slopeLevel(p){   /* 0 none, 1 Tier 1 (council Tier III, lowest), 2 Tier 2 / run-out, 3 Tier 3 (council Tier I, highest) */
   var m=0; (p.hazards||[]).forEach(function(h){
     if(h.kind==='slope'){ var lv={slopeI:3,slopeII:2,slopeRunout:2,slopeIII:1}[h.key]||0; if(lv>m)m=lv; } });
   return m;
 }
+/* display labels matching the slider's ascending scheme (Tier 3 = highest, council "Tier I") */
+var SLOPE_KEY_LBL={slopeI:'Tier 3',slopeII:'Tier 2',slopeIII:'Tier 1',slopeRunout:'Run-out'};
+function slopeScn(h){ return SLOPE_KEY_LBL[h.key] || (h.scenario||'').replace(' (highest)',''); }
 function liqLevel(p){
   var m=0; (p.hazards||[]).forEach(function(h){
     if(h.kind==='ground'){ var lv=h.rank>=3?2:(h.rank>0?1:0); if(lv>m)m=lv; } });
@@ -769,7 +772,7 @@ function chipsFor(p){
   return hz.map(function(h){
     var cls = isFuture(h) ? 'future' : (h.rank>=3?'high':'watch');
     var label = h.name==='Liquefaction' ? 'Liquefaction: '+h.detail.replace('Liquefaction Damage is ','').replace(' Liquefaction Vulnerability','')
-              : h.kind==='slope' ? h.scenario.replace(' (highest)','')+' slope'
+              : h.kind==='slope' ? slopeScn(h)+' slope'
               : h.name+' '+(h.depth||'');
     return [cls, label.trim()+(isFuture(h)?' · 2130':'')];
   });
@@ -779,7 +782,9 @@ function detailHTML(p){
   var hz=(p.hazards||[]);
   var rows = hz.length ? hz.map(function(h){
       var cls = isFuture(h) ? 'sev-future' : (h.rank>=3?'sev-high':(h.rank>0?'sev-watch':'sev-ok'));
-      return '<li class="'+cls+'"><span class="hzname">'+h.name+'</span><span class="hzscn">'+h.scenario+'</span><span class="hzval">'+h.detail+'</span></li>';
+      var scn = h.kind==='slope' ? slopeScn(h) : h.scenario;
+      var val = h.kind==='slope' ? slopeScn(h) : h.detail;
+      return '<li class="'+cls+'"><span class="hzname">'+h.name+'</span><span class="hzscn">'+scn+'</span><span class="hzval">'+val+'</span></li>';
     }).join('')
     : '<li class="sev-ok"><span class="hzname">'+(p.outsideCoverage?'No council data':'Nothing flagged')+'</span><span class="hzscn">'+(p.outsideCoverage?'Site is outside the Nelson City Council boundary — Tasman District Council publishes this area':'Point falls outside every Nelson City Council hazard polygon queried')+'</span><span class="hzval"></span></li>';
 
