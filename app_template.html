@@ -400,7 +400,7 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
       </div>
       <div class="searchAndAdd">
         <input type="search" id="search" class="search" placeholder="Search address or suburb…" aria-label="Search properties by address or suburb" autocomplete="off">
-        <button type="button" class="ghost addbtn" id="addBtn" aria-expanded="false" aria-controls="addPanel">&#10133;</button>
+        <button type="button" class="ghost addbtn" id="addBtn" aria-expanded="false" aria-controls="addPanel" aria-label="Add a property" title="Add a property">&#10133;</button>
       </div>
       <div class="listhead">
         <h2 id="listTitle">Ranked</h2>
@@ -1097,8 +1097,15 @@ function select(id, scroll){
   var panel=document.getElementById('addPanel'), addBtn=document.getElementById('addBtn'),
       statusEl=document.getElementById('aStatus'), submit=document.getElementById('aSubmit');
   function setStatus(msg,cls){ statusEl.textContent=msg||''; statusEl.className='astatus'+(cls?' '+cls:''); }
-  function toggle(open){ panel.hidden=!open; addBtn.setAttribute('aria-expanded',open?'true':'false'); if(open) document.getElementById('aAddr').focus(); }
-  addBtn.addEventListener('click',function(){ toggle(panel.hidden); });
+  function toggle(open){ panel.hidden=!open; addBtn.setAttribute('aria-expanded',open?'true':'false'); addBtn.textContent=open?'➖':'➕'; if(open) document.getElementById('aAddr').focus(); }
+  addBtn.addEventListener('click',function(){
+    var opening=panel.hidden;
+    if(opening){   /* carry over whatever they typed in the search box */
+      var q=document.getElementById('search').value.trim(), addrEl=document.getElementById('aAddr');
+      if(q && !addrEl.value.trim()) addrEl.value=q;
+    }
+    toggle(opening);
+  });
   document.getElementById('aCancel').addEventListener('click',function(){ toggle(false); setStatus(''); });
 
   submit.addEventListener('click',function(){
