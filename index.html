@@ -263,6 +263,7 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
       <label for="rank">Rank by</label>
       <select id="rank">
         <option value="hazard">Hazard exposure (least first)</option>
+        <option value="recent">Recent listings</option>
         <option value="age-old">Age — oldest first</option>
         <option value="age-new">Age — newest first</option>
         <option value="distance">Distance to</option>
@@ -658,6 +659,10 @@ var openId=null;
 function priceOf(p){ return p.ask || p.cv || 0; }
 function fmt$(n){ return n ? '$'+n.toLocaleString('en-NZ') : '—'; }
 function dec(p){ return p.decade ? p.decade+'s' : '—'; }
+function fmtListed(s){
+  var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s||''); if(!m) return '—';
+  return (+m[3])+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m[2]-1]+" '"+m[1].slice(2);
+}
 /* BRANZ corrosion zone B/C/D shown in plainer terms */
 function corrZone(p){ return {'Zone B':'Lowest','Zone C':'Moderate','Zone D':'Highest'}[p.corrosionZone] || (p.corrosionZone||'—'); }
 
@@ -736,6 +741,7 @@ function sorted(){
     if(a.outsideCoverage!==b.outsideCoverage) return a.outsideCoverage?1:-1;
     return (a.hazardScore-b.hazardScore) || (a.hazardCount-b.hazardCount) || a.address.localeCompare(b.address);
   };
+  else if(mode==='recent') cmp=function(a,b){ return (b.listed||'').localeCompare(a.listed||'') || a.address.localeCompare(b.address) };
   else if(mode==='age-old') cmp=function(a,b){ return a.decade-b.decade || a.address.localeCompare(b.address) };
   else if(mode==='age-new') cmp=function(a,b){ return b.decade-a.decade || a.address.localeCompare(b.address) };
   else if(mode==='distance') cmp=function(a,b){ return refFor(a).km-refFor(b).km };
@@ -747,6 +753,7 @@ function sorted(){
 
 function metricFor(p,mode){
   if(mode==='distance'){ var r=refFor(p); return [fmtKm(r.km), r.name.length>22?r.name.slice(0,21)+'…':r.name, fmtWalk(r.km)]; }
+  if(mode==='recent') return [fmtListed(p.listed),'listed'];
   if(mode==='age-old'||mode==='age-new') return [dec(p),'built'];
   if(mode==='price') return [p.ask?fmt$(p.ask):fmt$(p.cv), p.ask?'asking':'capital value'];
   if(mode==='land') return [p.land.toLocaleString()+' m²','land'];
@@ -821,7 +828,7 @@ function render(){
   var mode=document.getElementById('rank').value;
   var list=sorted();
   document.getElementById('count').textContent=list.length+' of '+P.length+' shown';
-  var titles={hazard:'Least exposed first','age-old':'Oldest first','age-new':'Newest first',
+  var titles={hazard:'Least exposed first',recent:'Newest listings first','age-old':'Oldest first','age-new':'Newest first',
               distance:'Closest first',price:'Cheapest first',land:'Most land first',floor:'Largest floor first'};
   document.getElementById('listTitle').textContent=titles[mode];
   rowsEl.innerHTML='';
