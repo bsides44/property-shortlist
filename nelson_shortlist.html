@@ -116,6 +116,23 @@ svg.map.grabbing{cursor:grabbing}
 .search{width:100%;font-family:"Public Sans",sans-serif;font-size:14.5px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:9px 12px;margin-bottom:12px}
 .search::placeholder{color:var(--muted)}
 .search:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* ---------- add property ---------- */
+.addbtn{margin-bottom:12px}
+.addbtn:hover{border-color: var(--accent); background: var(--surface-2);}
+.addpanel{background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--r);padding:14px;margin-bottom:12px;display:flex;flex-direction:column;gap:11px}
+.afield{display:flex;flex-direction:column;gap:4px;font-family:"Archivo Narrow",sans-serif;text-transform:uppercase;letter-spacing:.08em;font-size:10.5px;color:var(--muted)}
+.afield input,.afield textarea{font-family:"Public Sans",sans-serif;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px}
+.afield input:focus-visible,.afield textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.afield textarea{resize:vertical;min-height:52px}
+.areq{color:var(--high)} .aopt{color:var(--muted);text-transform:none;letter-spacing:0}
+.agrid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.aacts{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.aprimary{border-color:var(--accent);color:var(--accent);font-weight:600}
+.aprimary:disabled{opacity:.5;cursor:default}
+.astatus{font-size:12.5px;color:var(--muted)}
+.astatus.err{color:var(--high)} .astatus.ok{color:var(--ok)}
+.anote{margin:2px 0 0;font-size:11.5px;color:var(--muted);line-height:1.4}
+.chip.mine{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent)}
 .listhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
 .listhead h2{font-family:"Archivo Narrow",sans-serif;text-transform:uppercase;letter-spacing:.11em;font-size:12px;margin:0;color:var(--ink-2)}
 .listhead .count{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--muted)}
@@ -132,6 +149,7 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
 .row.mapoff{opacity:.5}
 .row.mapoff .addr{text-decoration:line-through;text-decoration-color:var(--line)}
 .addr{font-weight:600;font-size:15px;line-height:1.3}
+.searchAndAdd{display: flex;gap: 5px;}
 .sub{grid-column:2;font-size:13px;color:var(--muted);margin-top:2px;display:flex;flex-wrap:wrap;gap:4px 12px}
 .sub b{font-family:"IBM Plex Mono",monospace;font-weight:500;color:var(--ink-2);font-variant-numeric:tabular-nums}
 .metric{grid-row:1/3;grid-column:3;text-align:right;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;align-self:center}
@@ -220,6 +238,9 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
 
   /* list: larger text, roomier rows */
   .search{font-size:16px;padding:13px 14px;min-height:48px}
+  .agrid{grid-template-columns:repeat(2,1fr)}
+  .afield input,.afield textarea{font-size:16px;padding:11px 12px}
+  .addbtn,.aacts button{min-height:46px}
   .listhead h2{font-size:14px}
   .listhead .count{font-size:13px}
   .row{padding:14px 14px;grid-template-columns:40px minmax(0,1fr) auto;column-gap:12px}
@@ -355,7 +376,32 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
     </div>
 
     <div>
-      <input type="search" id="search" class="search" placeholder="Search address or suburb…" aria-label="Search properties by address or suburb" autocomplete="off">
+      <div class="addpanel" id="addPanel" hidden>
+        <label class="afield">Address <span class="areq">*</span>
+          <input type="text" id="aAddr" placeholder="e.g. 12 Example Street, Stoke" autocomplete="off"></label>
+        <label class="afield">Listing link <span class="aopt">(optional)</span>
+          <input type="url" id="aUrl" placeholder="https://…" autocomplete="off"></label>
+        <div class="agrid">
+          <label class="afield">Beds<input type="number" id="aBeds" min="0" step="1"></label>
+          <label class="afield">Baths<input type="number" id="aBaths" min="0" step="1"></label>
+          <label class="afield">Floor m²<input type="number" id="aFloor" min="0" step="1"></label>
+          <label class="afield">Land m²<input type="number" id="aLand" min="0" step="1"></label>
+        </div>
+        <label class="afield">Price <span class="aopt">(optional)</span>
+          <input type="text" id="aPrice" placeholder="e.g. $895,000 or Enquiries over $850,000" autocomplete="off"></label>
+        <label class="afield">Listing description <span class="aopt">(optional — scanned for double glazing / renovation)</span>
+          <textarea id="aDesc" rows="3" placeholder="Paste the listing blurb to auto-detect renovation / double glazing"></textarea></label>
+        <div class="aacts">
+          <button type="button" class="ghost aprimary" id="aSubmit">Add &amp; scan</button>
+          <button type="button" class="ghost" id="aCancel">Cancel</button>
+          <span class="astatus" id="aStatus" role="status" aria-live="polite"></span>
+        </div>
+        <p class="anote">Added properties are saved in this browser only — they aren't shared. Hazards and nearby places are looked up live; age / capital value aren't available for manual adds.</p>
+      </div>
+      <div class="searchAndAdd">
+        <input type="search" id="search" class="search" placeholder="Search address or suburb…" aria-label="Search properties by address or suburb" autocomplete="off">
+        <button type="button" class="ghost addbtn" id="addBtn" aria-expanded="false" aria-controls="addPanel">&#10133;</button>
+      </div>
       <div class="listhead">
         <h2 id="listTitle">Ranked</h2>
         <span class="count" id="count"></span>
@@ -396,7 +442,11 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
 "use strict";
 var DATA = JSON.parse(document.getElementById('data').textContent);
 var GEO  = JSON.parse(document.getElementById('geo').textContent);
-var P = DATA.properties, POIS = DATA.pois;
+var POIS = DATA.pois;
+var USER_KEY = 'nsl_user_props_v1';
+function loadUserProps(){ try{ return JSON.parse(localStorage.getItem(USER_KEY)||'[]')||[]; }catch(e){ return []; } }
+function saveUserProps(){ try{ localStorage.setItem(USER_KEY, JSON.stringify(P.filter(function(p){return p.userAdded;}))); }catch(e){} }
+var P = DATA.properties.concat(loadUserProps());   /* browser-saved manual additions */
 var hidden = {};                       /* property ids manually un-ticked in the list (removed from map) */
 var F = {built:null, price:null, land:null, floor:null, beds:null,
          slope:null, liq:null, wind:null, corr:null, fault:null};  /* "more filters" thresholds */
@@ -558,14 +608,16 @@ drawBase();
 
 var dotG=el('g',{}); svg.appendChild(dotG);
 var dots={};
-P.forEach(function(p){
+function makeDot(p){
   var c=el('circle',{cx:X(p.lon).toFixed(1),cy:Y(p.lat).toFixed(1),r:5,
     fill:SEVCOL[p.sev],stroke:'var(--surface)','stroke-width':1.5,class:'dot','data-id':p.id});
   c.style.cursor='pointer';
   c.addEventListener('click',function(){ if(suppressClick) return; select(p.id,true); });
   dotG.appendChild(c);
   dots[p.id]=c;
-});
+  return c;
+}
+P.forEach(makeDot);
 
 /* marker for a chosen Specific Place (drawn on top of the property dots) */
 var placeMarker=el('g',{}); placeMarker.style.display='none'; svg.appendChild(placeMarker);
@@ -759,8 +811,8 @@ function metricFor(p,mode){
   if(mode==='recent') return [fmtListed(p.listed),'listed'];
   if(mode==='age-old'||mode==='age-new') return [dec(p),'built'];
   if(mode==='price') return [p.ask?fmt$(p.ask):fmt$(p.cv), p.ask?'asking':'capital value'];
-  if(mode==='land') return [p.land.toLocaleString()+' m²','land'];
-  if(mode==='floor') return [p.floor+' m²','floor'];
+  if(mode==='land') return [p.land!=null?p.land.toLocaleString()+' m²':'—','land'];
+  if(mode==='floor') return [p.floor!=null?p.floor+' m²':'—','floor'];
   if(p.outsideCoverage) return ['—','no council data'];
   return [String(p.hazardCount), p.hazardCount===1?'flag':'flags'];
 }
@@ -803,8 +855,8 @@ function detailHTML(p){
     + '<div><dt>Capital value</dt><dd>'+fmt$(p.cv)+'</dd></div>'
     + '<div><dt>Land value</dt><dd>'+fmt$(p.landValue)+'</dd></div>'
     + '<div><dt>Last sale</dt><dd>'+fmt$(p.lastSale)+(p.lastSaleDate?' <span style="color:var(--muted)">'+p.lastSaleDate.slice(0,4)+'</span>':'')+'</dd></div>'
-    + '<div><dt>Beds / baths</dt><dd>'+p.beds+' / '+p.baths+'</dd></div>'
-    + '<div><dt>Floor / land</dt><dd>'+p.floor+' / '+p.land+' m²</dd></div>'
+    + '<div><dt>Beds / baths</dt><dd>'+(p.beds!=null?p.beds:'—')+' / '+(p.baths!=null?p.baths:'—')+'</dd></div>'
+    + '<div><dt>Floor / land</dt><dd>'+(p.floor!=null?p.floor:'—')+' / '+(p.land!=null?p.land:'—')+' m²</dd></div>'
     + '<div><dt>Wind zone <span style="text-transform:none;letter-spacing:0">(BRANZ)</span></dt><dd>'+(p.windZone||'—')+'</dd></div>'
     + '<div><dt>Corrosion zone <span style="text-transform:none;letter-spacing:0">(BRANZ)</span></dt><dd>'+corrZone(p)+'</dd></div>'
     + '<div><dt>Listed</dt><dd>'+p.listed+'</dd></div>'
@@ -817,9 +869,11 @@ function detailHTML(p){
     + '<h4 style="font-family:Archivo Narrow,sans-serif;text-transform:uppercase;letter-spacing:.09em;font-size:10px;color:var(--muted);margin:0 0 6px;font-weight:600">Hazard layers intersecting this point</h4>'
     + '<ul class="hz">'+rows+'</ul>'
     + '<div class="nearest"><h4>Nearest of each kind</h4><ul>'+near+'</ul></div>'
-    + '<div class="acts"><a href="'+p.url+'" target="_blank" rel="noopener">View listing ↗</a>'
+    + '<div class="acts">'
+    + (p.url?'<a href="'+p.url+'" target="_blank" rel="noopener">View listing ↗</a>':'')
     + '<a href="https://experience.arcgis.com/experience/188c8d0a60d344ccbd80f8aa71c75184/page/River-Flooding" target="_blank" rel="noopener">Council hazard viewer ↗</a>'
     + '<a href="https://experience.arcgis.com/experience/6e83b0bb19d14a0db411aebdc301cf49/page/Page" target="_blank" rel="noopener">BRANZ zones ↗</a>'
+    + (p.userAdded?'<a href="#" class="removeUser" data-id="'+p.id+'" style="color:var(--high)">Remove ✕</a>':'')
     + '<span style="color:var(--muted);font-family:IBM Plex Mono,monospace;font-size:12px">'+p.lat.toFixed(5)+', '+p.lon.toFixed(5)+'</span></div>'
     + '</div>';
 }
@@ -850,11 +904,11 @@ function render(){
              +(cl>=2?'<span class="chip high">'+CORR_LBL[cl]+' corrosion</span>':'');
     var hz=chipsFor(p);
     if((wl>=2||cl>=2) && hz.length===1 && hz[0][0]==='ok') hz=[];   /* high wind / highest corrosion counts as a flag, so drop "Nothing flagged" */
-    var chips=hz.map(function(c){return '<span class="chip '+c[0]+'">'+c[1]+'</span>'}).join('')+zchips+fchips;
+    var chips=(p.userAdded?'<span class="chip mine">Added by you</span>':'')+hz.map(function(c){return '<span class="chip '+c[0]+'">'+c[1]+'</span>'}).join('')+zchips+fchips;
     li.innerHTML='<span class="rank"><input type="checkbox" class="mapchk" '+(hidden[p.id]?'':'checked')+' aria-label="Show this property on the map">'+(i+1)+'</span>'
       +'<span class="addr">'+p.address.replace(/, Nelson$/,'')+'</span>'
       +'<span class="metric"><b>'+m[0]+'</b><span>'+m[1]+'</span>'+(m[2]?'<span class="walk">'+m[2]+'</span>':'')+'</span>'
-      +'<span class="sub"><b>'+dec(p)+'</b><span>'+p.priceText+'</span><b>'+p.beds+'</b><span>bd</span><b>'+p.land+'</b><span>m² land</span></span>'
+      +'<span class="sub"><b>'+dec(p)+'</b><span>'+(p.priceText||'')+'</span><b>'+(p.beds!=null?p.beds:'—')+'</b><span>bd</span><b>'+(p.land!=null?p.land:'—')+'</b><span>m² land</span></span>'
       +'<span class="chips">'+chips+'</span>'
       +(openId===p.id?detailHTML(p):'');
     li.addEventListener('click',function(e){ if(e.target.closest('a')||e.target.classList.contains('mapchk')) return; select(p.id); });
@@ -963,6 +1017,130 @@ function select(id, scroll){
     var willOpen=panel.hidden;
     panel.hidden=!willOpen;
     btn.setAttribute('aria-expanded', willOpen?'true':'false');
+  });
+})();
+
+/* ---------- add a property (client-side; saved to this browser via localStorage) ---------- */
+(function(){
+  var ARC='https://services1.arcgis.com/Y4k7lyf2XTGeQC6V/arcgis/rest/services';
+  var DEPTH_RANK={"0 - 20cm":1,">5 - 20cm":1,">20 - 50cm":2,">50cm - 1m":3,">1 - 2m":4,">2m":5};
+  var HZ_META={
+    river2020:['River flooding','Present day, 1% AEP','flood'], river2130:['River flooding','2130 projection','flood'],
+    coast2020:['Coastal flooding','Present day','coastal'], coast2130:['Coastal flooding','2130, SSP5-8.5M','coastal'],
+    runup2020:['Wave run-up','Present day','coastal'], runup2130:['Wave run-up','2130, SSP5-8.5M','coastal'],
+    erosionNow:['Coastal erosion','Current','coastal'], erosion2130:['Coastal erosion','2130, 8.5M','coastal'],
+    liqA:['Liquefaction','Regional assessment (Level A)','ground'], liqB:['Liquefaction','Tāhunanui assessment (Level B)','ground'],
+    slopeI:['Slope instability','Tier I (highest)','slope'], slopeII:['Slope instability','Tier II','slope'],
+    slopeIII:['Slope instability','Tier III','slope'], slopeRunout:['Slope instability','Run-out zone','slope'],
+    fault:['Fault line','Fault rupture zone','fault']
+  };
+  var HZ_LAYERS=[
+    ['river2020','River_Flooding_Depth_2020',[4,5,6,7,8]], ['river2130','River_Flooding_Depth_2130',[0,1,2,3,4]],
+    ['coast2020','Coastal_Flooding_Depth',[7]], ['coast2130','Coastal_Flooding_Depth',[10]],
+    ['runup2020','Wave_Runup',[2]], ['runup2130','Wave_Runup',[20]],
+    ['erosionNow','Coastal_Erosion_Hazards',[1]], ['erosion2130','Coastal_Erosion_Hazards',[7]],
+    ['liqB','Natural_Hazards_Liquefaction',[0]],
+    ['slopeI','Slope_Instability',[3]], ['slopeII','Slope_Instability',[2]],
+    ['slopeIII','Slope_Instability',[1]], ['slopeRunout','Slope_Instability',[0]],
+    ['fault','Fault_Deformation_Overlay',[59]]
+  ];
+  var LIQ_BENIGN=['unlikely','very low'];
+  function arc(service,layer,lon,lat){
+    var g=encodeURIComponent(JSON.stringify({x:lon,y:lat,spatialReference:{wkid:4326}}));
+    return fetch(ARC+'/'+service+'/FeatureServer/'+layer+'/query?geometry='+g+'&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json')
+      .then(function(r){return r.json();}).then(function(d){return d.features||[];}).catch(function(){return null;});
+  }
+  function makeHazard(key,a){
+    var meta=HZ_META[key], name=meta[0], scenario=meta[1], kind=meta[2], depth=null, rank=0, detail=scenario;
+    if(kind==='flood'||kind==='coastal'){
+      var raw=((a.Depth||'')+'').trim(), aep=((a.AnnualExceedanceProbability||'')+'').trim();
+      if(aep) raw=(raw+' @ '+aep).trim();
+      Object.keys(DEPTH_RANK).sort(function(x,y){return y.length-x.length;}).some(function(b){ if(raw.indexOf(b)>=0){depth=b;rank=DEPTH_RANK[b];return true;} });
+      detail=depth||(raw||scenario);
+    } else if(key==='liqA'||key==='liqB'){
+      detail=((a.LiquefactionCategory||'')+'').trim()||scenario; var low=detail.toLowerCase();
+      rank=LIQ_BENIGN.some(function(b){return low.indexOf(b)>=0;})?0:((low.indexOf('possible')>=0||low.indexOf('medium')>=0)?2:3);
+    } else if(kind==='slope'){ detail=scenario; rank={slopeI:4,slopeII:3,slopeIII:2,slopeRunout:3}[key]; }
+    else if(kind==='fault'){ detail=scenario; rank=4; }
+    return {key:key,name:name,scenario:scenario,kind:kind,detail:detail,depth:depth,rank:rank};
+  }
+  function scanHazards(lat,lon){
+    return arc('Natural_Hazards_Liquefaction',1,lon,lat).then(function(regional){
+      if(regional===null) return {outsideCoverage:false,hazards:[]};
+      if(regional.length===0) return {outsideCoverage:true,hazards:[]};
+      var tasks=[]; HZ_LAYERS.forEach(function(e){ e[2].forEach(function(lyr,idx){ tasks.push({key:e[0],idx:idx,svc:e[1],lyr:lyr}); }); });
+      return Promise.all(tasks.map(function(t){ return arc(t.svc,t.lyr,lon,lat).then(function(f){return {t:t,f:f};}); })).then(function(res){
+        var hits={};
+        res.forEach(function(r){ if(r.f&&r.f.length){ if(!(r.t.key in hits)||r.t.idx<hits[r.t.key].idx) hits[r.t.key]={idx:r.t.idx,attrs:r.f[0].attributes}; } });
+        var hazards=[makeHazard('liqA',regional[0].attributes)];
+        HZ_LAYERS.forEach(function(e){ if(hits[e[0]]) hazards.push(makeHazard(e[0],hits[e[0]].attrs)); });
+        return {outsideCoverage:false,hazards:hazards};
+      });
+    });
+  }
+  var G_TERMS=['double glaz','double-glaz','double glazed'];
+  var R_DONE=['renovated','refurbished','modernised','modernized','redone','re-done','recently renovated','fully renovated','beautifully renovated','tastefully renovated','extensively renovated','stylishly renovated','beautifully updated','tastefully updated','recently updated','fully updated','upgraded kitchen','new kitchen and bathroom','new bathroom and kitchen','brand new kitchen'];
+  var R_VETO=['to renovate','renovation project','potential to renovate','renovator','opportunity to renovate','scope to renovate','ready to renovate','needs renovating','requires renovation','awaiting renovation','room to renovate','un-renovated','unrenovated','to be renovated','could be renovated','ripe for renovation','renovation awaits'];
+  function scanDesc(text){
+    var low=(text||'').toLowerCase();
+    var reno=R_DONE.some(function(w){return low.indexOf(w)>=0;}) && !R_VETO.some(function(v){return low.indexOf(v)>=0;});
+    var glaz=G_TERMS.some(function(w){return low.indexOf(w)>=0;});
+    function evid(terms){ var best=null; terms.forEach(function(w){var i=low.indexOf(w); if(i>=0&&(best===null||i<best[0]))best=[i,w];}); if(!best)return null; var s=Math.max(0,best[0]-20),snip=text.slice(s,best[0]+best[1].length); if(s>0)snip=snip.replace(/^\S*\s/,''); return snip.replace(/\s+/g,' ').replace(/^[ ,.\-]+|[ ,.\-]+$/g,''); }
+    var ev=[]; if(reno) ev.push(evid(R_DONE)||'renovated'); if(glaz) ev.push(evid(G_TERMS)||'double glazed');
+    return {reno:reno,glaz:glaz,evidence:ev.join('; ')};
+  }
+  function geocode(addr){
+    var base=addr.replace(/\s*,?\s*(nelson|new zealand|nz)\s*$/i,'');
+    return fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(base+', Nelson, New Zealand'))
+      .then(function(r){return r.json();}).then(function(a){ return (a&&a[0])?{lat:+a[0].lat,lon:+a[0].lon}:null; }).catch(function(){return null;});
+  }
+  function numOr(id){ var v=document.getElementById(id).value.trim(); return (v===''||isNaN(+v))?null:+v; }
+
+  var panel=document.getElementById('addPanel'), addBtn=document.getElementById('addBtn'),
+      statusEl=document.getElementById('aStatus'), submit=document.getElementById('aSubmit');
+  function setStatus(msg,cls){ statusEl.textContent=msg||''; statusEl.className='astatus'+(cls?' '+cls:''); }
+  function toggle(open){ panel.hidden=!open; addBtn.setAttribute('aria-expanded',open?'true':'false'); addBtn.innerHTML=open?'&#10134;':'&#10133;'; if(open) document.getElementById('aAddr').focus(); }
+  addBtn.addEventListener('click',function(){ toggle(panel.hidden); });
+  document.getElementById('aCancel').addEventListener('click',function(){ toggle(false); setStatus(''); });
+
+  submit.addEventListener('click',function(){
+    var addr=document.getElementById('aAddr').value.trim();
+    if(!addr){ setStatus('Enter an address','err'); return; }
+    submit.disabled=true; setStatus('Finding address…');
+    geocode(addr).then(function(coords){
+      if(!coords){ setStatus('Couldn’t find that address — check the spelling','err'); submit.disabled=false; return; }
+      setStatus('Checking council hazards…');
+      return scanHazards(coords.lat,coords.lon).then(function(hz){
+        var price=document.getElementById('aPrice').value.trim(), ask=null, m=/\$([\d,]+)/.exec(price);
+        if(m) ask=+m[1].replace(/,/g,'');
+        var descVal=document.getElementById('aDesc').value.trim(), sc=scanDesc(descVal);
+        var flagged=hz.hazards.filter(function(h){return h.rank>0;});
+        var p={ id:'user-'+Date.now(), userAdded:true, address:addr, url:document.getElementById('aUrl').value.trim(),
+          lat:coords.lat, lon:coords.lon, beds:numOr('aBeds'), baths:numOr('aBaths'), parking:null,
+          floor:numOr('aFloor'), land:numOr('aLand'), priceText:price, ask:ask, listed:'',
+          outsideCoverage:hz.outsideCoverage, hazards:hz.hazards,
+          hazardScore:flagged.reduce(function(s,h){return s+h.rank;},0), hazardCount:flagged.length,
+          decade:null, constr:null, cv:null, landValue:null, improvValue:null, lastSale:null, lastSaleDate:null,
+          reno:sc.reno, dblGlaz:sc.glaz, featEvidence:sc.evidence, descScanned:!!descVal, windZone:null, corrosionZone:null };
+        p.sev=severity(p);
+        P.push(p); makeDot(p); saveUserProps();
+        ['aAddr','aUrl','aBeds','aBaths','aFloor','aLand','aPrice','aDesc'].forEach(function(id){ document.getElementById(id).value=''; });
+        submit.disabled=false; toggle(false); setStatus('');
+        openId=p.id; render();
+        var node=rowsEl.querySelector('[aria-expanded="true"]'); if(node) node.scrollIntoView({block:'center',behavior:'smooth'});
+      });
+    }).catch(function(){ setStatus('Something went wrong — try again','err'); submit.disabled=false; });
+  });
+
+  /* remove a browser-added property */
+  rowsEl.addEventListener('click',function(e){
+    var rm=e.target.closest('.removeUser'); if(!rm) return;
+    e.preventDefault(); e.stopPropagation();
+    var id=rm.getAttribute('data-id');
+    P=P.filter(function(p){return p.id!==id;});
+    if(dots[id]){ if(dots[id].parentNode) dots[id].parentNode.removeChild(dots[id]); delete dots[id]; }
+    delete hidden[id]; if(openId===id) openId=null;
+    saveUserProps(); render();
   });
 })();
 
