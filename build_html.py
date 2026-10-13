@@ -14,8 +14,7 @@ def build():
         for k in ("constrCode", "councilAddress"):
             p.pop(k, None)
     geo = open(os.path.join(HERE, "geo.json"), encoding="utf-8").read().strip()
-    out = (tpl.replace("__SRC__", data.get("sourceUrl", ""))
-              .replace("__DATA__", json.dumps(data, ensure_ascii=False).replace("</", "<\\/"))
+    out = (tpl.replace("__DATA__", json.dumps(data, ensure_ascii=False).replace("</", "<\\/"))
               .replace("__GEO__", geo.replace("</", "<\\/")))
     for name in ("nelson_shortlist.html", "index.html"):
         with open(os.path.join(HERE, name), "w", encoding="utf-8") as f:

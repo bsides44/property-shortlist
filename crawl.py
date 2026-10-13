@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""Discover Nelson houses for sale on realestate.co.nz that meet a hard filter,
-enrich each with Nelson City Council hazard data, homes.co.nz age/valuation and a
-double-glazing / renovation description scan, and merge the result into data.json.
+"""Discover houses for sale on realestate.co.nz that meet a hard filter, in each
+map region (see REGIONS: Nelson, and Wellington up to Paraparaumu), enrich each
+with council hazard data where the region has it (Nelson City Council so far),
+homes.co.nz age/valuation and a double-glazing / renovation description scan, and
+merge the result into data.json.
 
 Designed to run unattended in GitHub Actions (see .github/workflows/update.yml).
 Only *new* listings are enriched each run, capped for politeness; listings that
@@ -10,7 +12,8 @@ one line (endpoint + status) so a failing run can be diagnosed from CI logs.
 
 Data sources
   realestate.co.nz  -> candidate listings + description + coords + floor/land/beds
-  NCC ArcGIS        -> flood / coastal / liquefaction / slope / fault hazards
+  NCC ArcGIS        -> Nelson flood / coastal / liquefaction / slope / fault hazards
+  GWRC + WCC / PCC / KCDC ArcGIS -> the same for Wellington, plus tsunami zones
   homes.co.nz       -> decade built, capital/land/improvement value, construction
 
 Nothing here needs auth. Be gentle: one request every REQUEST_DELAY seconds to the
@@ -23,22 +26,47 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "data.json")
 
 # ---------------------------------------------------------------- hard filter
-# realestate.co.nz district id (271 = Nelson) and category/type used by its
-# public search API. res_sale + propertyType 1 = residential houses for sale.
-RE_DISTRICT   = 271
+# res_sale + propertyType 1 = residential houses for sale; the same filter
+# applies to every region.
 MIN_BEDS      = 3
 MIN_FLOOR     = 120                       # m^2
 MIN_LAND      = 250                       # m^2
-# keep the map readable: only listings within RADIUS_KM of Tahunanui. This also
-# drops the odd mis-tagged listing (e.g. a Bishopdale, Christchurch address that
-# comes back under the Nelson district).
-CENTRE        = (-41.2930, 173.2440)      # Tahunanui, Nelson (lat, lon)
-RADIUS_KM     = 15
-# northern cut-off: nothing in Marybank or beyond it. The latitude line sits just
-# south of Marybank, so it also catches listings addressed as "Atawhai" that are
-# level with or north of it (Atawhai Downs, upper Atawhai Drive); Atawhai proper stays.
-EXCLUDE_SUBURBS = {"marybank", "todds valley", "hira", "glenduan", "wakapuaka", "cable bay"}
-NORTH_LIMIT_LAT = -41.2310
+
+# One entry per map region (the viewer's region toggle). Per region:
+#   districts    realestate.co.nz district id -> the town name appended to addresses
+#   centre/radius_km  keep the map readable, and drop the odd mis-tagged listing
+#                (e.g. a Bishopdale, Christchurch address that comes back under the
+#                Nelson district, or an Otaki house tagged "Paraparaumu")
+#   exclude_suburbs / north_limit_lat  northern cut-off
+#   hazards      which council hazard registry covers it: "ncc" (HAZARD_LAYERS) or
+#                "wgtn" (WGTN_LAYERS); None = not wired up yet
+REGIONS = {
+    "nelson": dict(
+        label="Nelson",
+        districts={271: "Nelson"},
+        centre=(-41.2930, 173.2440), radius_km=15,      # Tahunanui
+        # nothing in Marybank or beyond it. The latitude line sits just south of
+        # Marybank, so it also catches listings addressed as "Atawhai" that are level
+        # with or north of it (Atawhai Downs, upper Atawhai Drive); Atawhai proper stays.
+        exclude_suburbs={"marybank", "todds valley", "hira", "glenduan", "wakapuaka", "cable bay"},
+        north_limit_lat=-41.2310,
+        hazards="ncc",
+        source_url="https://www.realestate.co.nz/residential/sale/nelson-bays/nelson/house",
+    ),
+    "wellington": dict(
+        label="Wellington",
+        # Wellington City, Porirua and the Kapiti Coast as far as Paraparaumu (no Hutt Valley)
+        districts={265: "Wellington", 268: "Porirua", 261: "Kapiti Coast"},
+        centre=(-41.1100, 174.8700), radius_km=34,      # Paremata, mid-corridor
+        # Paraparaumu / Otaihanga are the last suburbs in; the latitude line follows
+        # the Waikanae River, north of both.
+        exclude_suburbs={"waikanae", "waikanae beach", "reikorangi", "peka peka", "te horo",
+                         "te horo beach", "hautere", "otaki", "otaki beach", "otaki forks"},
+        north_limit_lat=-40.8720,
+        hazards="wgtn",
+        source_url="https://www.realestate.co.nz/residential/sale/wellington/house",
+    ),
+}
 MAX_NEW_PER_RUN = int(os.environ.get("CRAWL_MAX_NEW", "40"))   # enrichments per run
 PRUNE_MIN_DISCOVERED = 20                 # only drop "gone" listings if discovery looked healthy
 REQUEST_DELAY = float(os.environ.get("CRAWL_HOMES_DELAY", "1.0"))  # seconds between homes.co.nz requests
@@ -50,7 +78,7 @@ ARC = "https://services1.arcgis.com/Y4k7lyf2XTGeQC6V/arcgis/rest/services"
 # realestate.co.nz's own search API (no auth). JSON-API; page via limit/offset.
 SEARCH_API = ("https://platform.realestate.co.nz/search/v1/listings"
               "?filter%5Bcategory%5D%5B%5D=res_sale"
-              "&filter%5Bdistrict%5D%5B%5D=" + str(RE_DISTRICT) +
+              "&filter%5Bdistrict%5D%5B%5D={district}"
               "&filter%5BpropertyType%5D%5B%5D=1"
               "&page%5Blimit%5D={limit}&page%5Boffset%5D={offset}")
 
@@ -116,16 +144,22 @@ HAZARD_LAYERS = [
 ]
 
 def arc_query(service, layer, lon, lat):
+    return layer_query(ARC + "/" + service + "/FeatureServer/" + str(layer), lon, lat)
+
+def layer_query(layer_url, lon, lat):
+    """Point-in-polygon against one ArcGIS layer (FeatureServer or MapServer).
+    Returns its intersecting features, or None if the request failed."""
     geom = urllib.parse.quote(json.dumps(
         {"x": lon, "y": lat, "spatialReference": {"wkid": 4326}}))
-    url = (ARC + "/" + service + "/FeatureServer/" + str(layer) + "/query"
+    url = (layer_url + "/query"
            "?geometry=" + geom + "&geometryType=esriGeometryPoint&inSR=4326"
            "&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json")
     txt = fetch(url, timeout=25)
     if txt is None:
         return None
     try:
-        return json.loads(txt).get("features", [])
+        d = json.loads(txt)
+        return None if "error" in d else d.get("features", [])
     except Exception:
         return None
 
@@ -194,6 +228,116 @@ def query_hazards(lat, lon):
         got = hits.get(key)
         if got:                       # first (lowest-index) catchment/tier that intersects
             hazards.append(make_hazard(key, got[min(got)]))
+    return {"outsideCoverage": False, "hazards": hazards}
+
+# ---------------------------------------------------------------- hazards: Wellington
+# Four publishers cover the Wellington region. Greater Wellington's regional layers
+# apply everywhere; each city / district council adds its own district-plan overlays.
+# One row per layer:
+#   council  gw (queried for every point) | wcc | pcc | kcdc (queried for that council's listings)
+#   group    layers in a group are alternatives, listed worst first: the first hit wins
+#   rank     same scale as Nelson: 0 = shown but not scored, 2 = worth checking, 3-4 = significant
+#   chip     the short label shown on the listing row
+#   mode     how the rank / wording is read from the feature's attributes (see wgtn_hazard)
+#   future   a sea-level-rise projection rather than a present-day hazard
+# The table is written into data.json ("hazardRegistry") and the viewer's "Add a
+# property" reads it from there, so this is the only copy.
+_GW   = "https://mapping.gw.govt.nz/arcgis/rest/services/GW/Emergencies_P/MapServer/"
+_WCC  = "https://gis.wcc.govt.nz/arcgis/rest/services/2024DistrictPlan/2024DistrictPlan/MapServer/"
+_PCC  = "https://services1.arcgis.com/kIwRm3UCyRHYbM8a/arcgis/rest/services/"
+_KCDC = "https://maps.kapiticoast.govt.nz/server/rest/services/Public/"
+def _pcc(name):
+    return _PCC + name + "_PDP2025/FeatureServer/0"
+def _row(council, group, key, url, name, scenario, kind, rank=0, chip=None, **extra):
+    return dict(council=council, group=group, key=key, url=url, name=name,
+                scenario=scenario, kind=kind, rank=rank, chip=chip or name, **extra)
+_SLR_W, _SLR_P, _SLR_K = "With 1.43 m sea-level rise", "With 1 m sea-level rise", "2120, 1.25 m sea-level rise"
+WGTN_LAYERS = [
+    # Greater Wellington Regional Council
+    _row("gw", "liq", "gwLiq", _GW + "10", "Liquefaction", "Regional liquefaction potential", "ground", mode="liq"),
+    _row("gw", "slope", "gwSlope", _GW + "11", "Slope failure", "Earthquake-induced, regional", "slope", mode="slope"),
+    _row("gw", "tsunami", "gwTsunami", _GW + "23", "Tsunami evacuation zone", "Regional evacuation zones", "tsunami", mode="tsunami"),
+    # Wellington City Council, 2024 District Plan
+    _row("wcc", "fault", "wccFaultWgtn", _WCC + "59", "Fault line", "Wellington Fault (high hazard area)", "fault", 4, "Wellington Fault"),
+    _row("wcc", "fault", "wccFaultOhariu", _WCC + "58", "Fault line", "Ohariu Fault (high hazard area)", "fault", 4, "Ohariu Fault"),
+    _row("wcc", "fault", "wccFaultShepherds", _WCC + "56", "Fault line", "Shepherds Gully Fault (low hazard area)", "fault", 4, "Shepherds Gully Fault"),
+    _row("wcc", "fault", "wccFaultTerawhiti", _WCC + "57", "Fault line", "Terawhiti Fault (low hazard area)", "fault", 4, "Terawhiti Fault"),
+    _row("wcc", "flood", "wccStream", _WCC + "63", "Flood hazard", "Stream corridor (high hazard area)", "flood", 4, "Flood: stream corridor"),
+    _row("wcc", "flood", "wccOverland", _WCC + "62", "Flood hazard", "Overland flowpath (medium hazard area)", "flood", 3, "Flood: overland flowpath"),
+    _row("wcc", "flood", "wccInundation", _WCC + "61", "Flood hazard", "Inundation area (low hazard area)", "flood", 2, "Flood: inundation area"),
+    _row("wcc", "coast", "wccCoast", _WCC + "50", "Coastal inundation", "Present day, 1:100 year storm", "coastal", 4),
+    _row("wcc", "coastF", "wccCoastSLR", _WCC + "49", "Coastal inundation", _SLR_W, "coastal", 2, future=True),
+    # Porirua City Council, district plan (PDP2025 layers)
+    _row("pcc", "fault", "pccFault", _pcc("Fault_Rupture_Zone"), "Fault line", "Fault rupture zone", "fault", 4, "Fault rupture zone", field="Fault_Name"),
+    _row("pcc", "flood", "pccStream", _pcc("Flood_Hazard_Stream_Corridor"), "Flood hazard", "Stream corridor", "flood", 4, "Flood: stream corridor"),
+    _row("pcc", "flood", "pccOverland", _pcc("Flood_Hazard_Overland_Flow"), "Flood hazard", "Overland flow", "flood", 3, "Flood: overland flow"),
+    _row("pcc", "flood", "pccInundation", _pcc("Flood_Hazard_Inundation"), "Flood hazard", "Inundation", "flood", 2, "Flood: inundation"),
+    _row("pcc", "coast", "pccCoast", _pcc("Coastal_Flood_Hazard_Current_Inundation_Risk"), "Coastal inundation", "Present day", "coastal", 4),
+    _row("pcc", "coastF", "pccCoastSLR", _pcc("Coastal_Flood_Hazard_1in100yr_Storm_Surge_with_1m_SLR"), "Coastal inundation", _SLR_P, "coastal", 2, future=True),
+    _row("pcc", "erosion", "pccErosion", _pcc("Coastal_Erosion_Hazard_Current_Erosion_Risk"), "Coastal erosion", "Present day", "coastal", 4),
+    _row("pcc", "erosionF", "pccErosionSLR", _pcc("Coastal_Erosion_Hazard_Future_Erosion_with_1m_SLR"), "Coastal erosion", _SLR_P, "coastal", 2, future=True),
+    # Kāpiti Coast District Council. Present-day coastal erosion is published as a
+    # line, not an area, so only the 2120 shoreline range can be tested against a point.
+    _row("kcdc", "fault", "kcdcFault", _KCDC + "District_Plan_Overlays/MapServer/10", "Fault line", "Fault avoidance area", "fault", 4, "Fault avoidance area", field="FAULT_NAME"),
+    _row("kcdc", "flood", "kcdcFlood", _KCDC + "District_Plan_Overlays/MapServer/11", "Flood hazard", "District plan flood hazard", "flood", mode="kflood"),
+    _row("kcdc", "erosionF", "kcdcErosionSLR", _KCDC + "Coastal_Erosion/MapServer/30", "Coastal erosion", _SLR_K, "coastal", 2, future=True),
+]
+TOWN_COUNCIL = {"Wellington": "wcc", "Porirua": "pcc", "Kapiti Coast": "kcdc"}
+
+def wgtn_hazard(e, a):
+    """One registry row + the attributes of the feature it hit -> a hazard record
+    (or None if the feature says nothing). Mirrored by wgtnHazard() in the viewer."""
+    h = dict(key=e["key"], name=e["name"], scenario=e["scenario"], kind=e["kind"],
+             detail=e["scenario"], depth=None, rank=e["rank"], chip=e["chip"])
+    if e.get("future"):
+        h["future"] = True
+    mode = e.get("mode")
+    if mode == "liq":
+        v = str(a.get("Liquefaction") or "").strip()
+        if not v:
+            return None
+        h.update(detail=v + " liquefaction potential", chip="Liquefaction: " + v,
+                 rank={"Very High": 3, "High": 3, "Moderate": 2}.get(v, 0))
+    elif mode == "slope":
+        # SEVERITY runs "1 Low" .. "5 High"; nearly all of the city is 1-2
+        n = int((re.match(r"\d", str(a.get("SEVERITY") or "")) or ["0"])[0])
+        level = {3: 1, 4: 2, 5: 3}.get(n, 0)
+        word = ["low", "moderate", "moderate to high", "high"][level]
+        h.update(detail="Severity %d of 5" % n if n else h["detail"], level=level,
+                 chip="Slope failure: " + word, rank=[0, 2, 3, 3][level])
+    elif mode == "tsunami":
+        c = str(a.get("Col_Code") or "").strip().lower()
+        if not c:
+            return None
+        h.update(detail=(c.title() + " zone - " + str(a.get("Evac_Zone") or "").strip()).strip(" -"),
+                 chip="Tsunami zone: " + c)
+    elif mode == "kflood":
+        z = str(a.get("ZONE") or "").strip()
+        low = z.lower()
+        h.update(detail=z or h["detail"], chip="Flood: " + (low or "hazard area"),
+                 rank=4 if "corridor" in low else 3 if "overflow" in low else 2)
+    elif e.get("field"):
+        v = str(a.get(e["field"]) or "").strip()
+        if v:
+            h.update(detail=v, chip=re.sub(r"\s+(Rupture Zone|Avoidance Area)$", "", v) or e["chip"])
+    return h
+
+def query_hazards_wgtn(lat, lon, town):
+    """Greater Wellington's regional layers plus the listing's own council's."""
+    council = TOWN_COUNCIL.get(town)
+    rows = [e for e in WGTN_LAYERS if e["council"] == "gw" or council in (None, e["council"])]
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        feats = list(ex.map(lambda e: layer_query(e["url"], lon, lat), rows))
+    if all(f is None for f in feats):
+        return None                           # every request failed; try again next run
+    hazards, done = [], set()
+    for e, f in zip(rows, feats):
+        gid = (e["council"], e["group"])
+        if not f or gid in done:
+            continue
+        h = wgtn_hazard(e, f[0]["attributes"])
+        if h:
+            hazards.append(h); done.add(gid)
     return {"outsideCoverage": False, "hazards": hazards}
 
 # ---------------------------------------------------------------- BRANZ building zones
@@ -395,7 +539,7 @@ def lead_photo(a):
             return IMG_HOST + base + ".crop.504x336.jpg"
     return None
 
-def parse_api(item):
+def parse_api(item, region, town):
     """Turn one realestate.co.nz search-API listing into our property record."""
     a = item.get("attributes", {})
     ad = a.get("address", {}) or {}
@@ -406,7 +550,7 @@ def parse_api(item):
     num = (ad.get("street-number") or "").strip()
     street = (ad.get("street-name") or ad.get("street") or "").strip()
     suburb = (ad.get("suburb-slug") or "").replace("-", " ").title()
-    address = ", ".join(x for x in [(num + " " + street).strip(), suburb, "Nelson"] if x)
+    address = ", ".join(x for x in [(num + " " + street).strip(), suburb, town] if x)
     price_txt = (a.get("price-display") or "").strip()
     ask = None
     m = re.search(r"\$([\d,]+)", price_txt)
@@ -414,6 +558,7 @@ def parse_api(item):
         ask = int(m.group(1).replace(",", ""))
     return dict(
         id=str(item.get("id")),
+        region=region,
         address=address,
         url=a.get("website-full-url") or ("https://www.realestate.co.nz/" + str(item.get("id"))),
         lat=lat, lon=lon,
@@ -429,32 +574,34 @@ def parse_api(item):
         _desc=strip_html(a.get("description")),
     )
 
-def discover():
-    """Page through realestate.co.nz's search API and return parsed candidate
-    listings (Nelson houses for sale). One JSON call per 100 results."""
-    out, offset, limit = [], 0, 100
-    while True:
-        txt = fetch(SEARCH_API.format(limit=limit, offset=offset))
-        if not txt:
-            break
-        try:
-            d = json.loads(txt)
-        except Exception:
-            break
-        data = d.get("data", [])
-        total = d.get("meta", {}).get("totalResults", 0)
-        for item in data:
-            p = parse_api(item)
-            if p:
-                out.append(p)
-        log("discover offset", offset, "-> got", len(data), "of", total)
-        offset += limit
-        if offset >= total or not data:
-            break
-        time.sleep(1.0)
-    return out
+def discover(region):
+    """Page through realestate.co.nz's search API and return (candidates, complete)
+    for one region: its parsed houses for sale, and whether every district was read
+    to the end. One JSON call per 100 results."""
+    out, complete = [], True
+    for district, town in REGIONS[region]["districts"].items():
+        offset, limit = 0, 100
+        while True:
+            txt = fetch(SEARCH_API.format(district=district, limit=limit, offset=offset))
+            try:
+                d = json.loads(txt)
+            except Exception:
+                complete = False
+                break
+            data = d.get("data", [])
+            total = d.get("meta", {}).get("totalResults", 0)
+            for item in data:
+                p = parse_api(item, region, town)
+                if p:
+                    out.append(p)
+            log("discover", town, "offset", offset, "-> got", len(data), "of", total)
+            offset += limit
+            if offset >= total or not data:
+                break
+            time.sleep(1.0)
+    return out, complete
 
-def km_from(lat, lon, centre=CENTRE):
+def km_from(lat, lon, centre):
     R = 6371.0
     dlat = math.radians(lat - centre[0]); dlon = math.radians(lon - centre[1])
     a = (math.sin(dlat / 2) ** 2 +
@@ -462,26 +609,48 @@ def km_from(lat, lon, centre=CENTRE):
     return 2 * R * math.asin(math.sqrt(a))
 
 def too_far_north(p):
+    cfg = REGIONS[p["region"]]
     parts = [x.strip().lower() for x in p.get("address", "").split(",")]
     suburb = parts[-2] if len(parts) >= 2 else ""
-    return suburb in EXCLUDE_SUBURBS or p["lat"] > NORTH_LIMIT_LAT
+    return suburb in cfg["exclude_suburbs"] or p["lat"] > cfg["north_limit_lat"]
 
 def qualifies(p):
     if p["beds"] is None or p["beds"] < MIN_BEDS:   return False
     if p["floor"] is None or p["floor"] < MIN_FLOOR: return False
     if p["land"] is None or p["land"] < MIN_LAND:   return False
-    if km_from(p["lat"], p["lon"]) > RADIUS_KM:     return False
+    cfg = REGIONS[p["region"]]
+    if km_from(p["lat"], p["lon"], cfg["centre"]) > cfg["radius_km"]: return False
     if too_far_north(p):                            return False
     return True
 
-def enrich(p):
-    """Fill hazards, homes.co.nz records and the description scan onto a parsed listing."""
-    hz = query_hazards(p["lat"], p["lon"])
+HAZ_V = 1      # bump to make the next run re-query hazards for a registry's listings
+
+def set_hazards(p):
+    """Query the region's hazard registry for one property. Returns False if the
+    council services could not be reached (the record is then left unversioned,
+    so the next run tries again)."""
+    kind = REGIONS[p["region"]]["hazards"]
+    if kind == "ncc":
+        hz = query_hazards(p["lat"], p["lon"])
+    elif kind == "wgtn":
+        hz = query_hazards_wgtn(p["lat"], p["lon"], p["address"].rsplit(", ", 1)[-1])
+    else:                                   # no council registry for this region yet
+        hz = {"outsideCoverage": True, "hazards": []}
+    ok = hz is not None
+    if not ok:
+        hz = {"outsideCoverage": True, "hazards": []}
     p["outsideCoverage"] = hz["outsideCoverage"]
     p["hazards"] = hz["hazards"]
     flagged = [h for h in p["hazards"] if h["rank"] > 0]
     p["hazardScore"] = sum(h["rank"] for h in flagged)
     p["hazardCount"] = len(flagged)
+    if ok and kind == "wgtn":
+        p["hazV"] = HAZ_V
+    return ok
+
+def enrich(p):
+    """Fill hazards, homes.co.nz records and the description scan onto a parsed listing."""
+    set_hazards(p)
 
     time.sleep(REQUEST_DELAY)
     p.update(enrich_homes(p["address"], p["lat"], p["lon"]))
@@ -500,7 +669,10 @@ def enrich(p):
 def save_state(state, props):
     state["properties"] = sorted(props.values(), key=lambda x: x.get("address", ""))
     state["collection"] = "Nelson"
-    state["sourceUrl"] = "https://www.realestate.co.nz/residential/sale/nelson-bays/nelson/house"
+    state["sourceUrl"] = REGIONS["nelson"]["source_url"]
+    state["regions"] = {k: {"label": c["label"], "sourceUrl": c["source_url"],
+                            "hazards": bool(c["hazards"])} for k, c in REGIONS.items()}
+    state["hazardRegistry"] = {"wellington": WGTN_LAYERS}
     state["generated"] = time.strftime("%Y-%m-%d")
     state["criteria"] = {"beds_min": MIN_BEDS, "floor_min": MIN_FLOOR, "land_min": MIN_LAND}
     tmp = DATA + ".tmp"
@@ -510,12 +682,24 @@ def save_state(state, props):
 def main():
     state = json.load(open(DATA, encoding="utf-8"))
     props = {p["id"]: p for p in state.get("properties", [])}
+    for p in props.values():
+        p.setdefault("region", "nelson")       # records from before regions existed
 
-    candidates = discover()
-    qualifying = [p for p in candidates if qualifies(p)]
+    # discover each region in turn; a region is only pruned if its own discovery
+    # was complete and looked healthy, so one failed region can't empty another
+    candidates, qualifying, prunable = [], [], set()
+    for region, cfg in REGIONS.items():
+        cands, complete = discover(region)
+        qual = [p for p in cands if qualifies(p)]
+        candidates += cands; qualifying += qual
+        if complete and len(qual) >= PRUNE_MIN_DISCOVERED:
+            prunable.add(region)
+        else:
+            log("%s discovery incomplete or too small (%d) - skipping prune this run"
+                % (cfg["label"], len(qual)))
+        log("discovered %d %s houses, %d meet the filter (%d+ bed, %dm2+ floor, %dm2+ land)"
+            % (len(cands), cfg["label"], len(qual), MIN_BEDS, MIN_FLOOR, MIN_LAND))
     disc_set = {p["id"] for p in qualifying}
-    log("discovered %d Nelson houses, %d meet the filter (%d+ bed, %dm2+ floor, %dm2+ land)"
-        % (len(candidates), len(qualifying), MIN_BEDS, MIN_FLOOR, MIN_LAND))
 
     # enrich + add new qualifying listings (capped for politeness). We checkpoint
     # data.json every few adds so an interrupted run keeps its progress and the
@@ -549,14 +733,22 @@ def main():
             p["reno"], p["dblGlaz"], p["featEvidence"], p["descScanned"] = reno, glaz, ev, True
 
     removed = 0
-    if len(disc_set) >= PRUNE_MIN_DISCOVERED:
-        for lid in list(props):
-            if lid not in disc_set:
-                log("REMOVED (off market / no longer qualifies)", props[lid].get("address", lid))
-                del props[lid]; removed += 1
-    else:
-        log("discovery too small (%d) - skipping prune this run" % len(disc_set))
+    for lid in list(props):
+        if lid not in disc_set and props[lid]["region"] in prunable:
+            log("REMOVED (off market / no longer qualifies)", props[lid].get("address", lid))
+            del props[lid]; removed += 1
     skipped = len(candidates) - len(qualifying)
+
+    # (re)query hazards for Wellington listings enriched before the registry existed
+    # or under an older version of it
+    stale = [p for p in props.values()
+             if REGIONS[p["region"]]["hazards"] == "wgtn" and p.get("hazV") != HAZ_V]
+    for i, p in enumerate(stale):
+        set_hazards(p)
+        if (i + 1) % 50 == 0:
+            save_state(state, props)
+    if stale:
+        log("hazards refreshed for", len(stale), "Wellington listings")
 
     # backfill BRANZ zones for any property that lacks them (cheap: tiles are cached)
     branz_filled = 0
