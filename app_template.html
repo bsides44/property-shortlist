@@ -675,9 +675,21 @@ function applyView(){
   document.getElementById('scalebar').textContent=(across<10?across.toFixed(1):Math.round(across))+' km across';
   paintDots();          /* re-size pins so they stay a constant on-screen size */
   updatePlaceMarker();
+  /* the list follows the map: once the view settles, show only what's inside it */
+  if(viewKey()!==listViewKey){ clearTimeout(listTimer); listTimer=setTimeout(render,140); }
   document.getElementById('zin').disabled = view.w<=MINW+0.5;
   document.getElementById('zout').disabled = view.w>=VB.w-0.5;
 }
+var listViewKey='', listTimer=null;             /* the view the list was last drawn for */
+function viewKey(){ return [view.x,view.y,view.w].map(function(n){return n.toFixed(1);}).join(','); }
+function isZoomed(){ return view.w<VB.w-0.5; }
+/* at full extent everything counts as in view, including pins that sit off the map frame */
+function inView(p){
+  if(!isZoomed()) return true;
+  var x=X(p.lon), y=Y(p.lat);
+  return x>=view.x && x<=view.x+view.w && y>=view.y && y<=view.y+view.h;
+}
+function resetView(){ view={x:0,y:0,w:VB.w,h:VB.h}; applyView(); }
 function zoomAt(cx,cy,factor){
   var nw=Math.max(MINW,Math.min(VB.w,view.w*factor)), nh=nw*(VB.h/VB.w);
   view.x+=(cx-view.x)*(1-nw/view.w);
@@ -803,7 +815,7 @@ function passesFilters(p){
 
 function sorted(){
   var mode=document.getElementById('rank').value;
-  var list=P.filter(passesFilters);
+  var list=P.filter(function(p){ return passesFilters(p) && inView(p); });
   var cmp;
   /* properties with no council coverage sort last — absence of data is not absence of hazard */
   if(mode==='hazard') cmp=function(a,b){
@@ -909,7 +921,8 @@ function render(){
   syncRefVisibility();
   var mode=document.getElementById('rank').value;
   var list=sorted();
-  document.getElementById('count').textContent=list.length+' of '+P.length+' shown';
+  clearTimeout(listTimer); listViewKey=viewKey();
+  document.getElementById('count').textContent=list.length+' of '+P.length+(isZoomed()?' in map view':' shown');
   var titles={hazard:'Least exposed first',recent:'Newest listings first','age-old':'Oldest first','age-new':'Newest first',
               distance:'Closest first',price:'Cheapest first',land:'Most land first',floor:'Largest floor first'};
   document.getElementById('listTitle').textContent=titles[mode];
@@ -1272,6 +1285,8 @@ function select(id, scroll){
 
   function first(){ for(var i=0;i<arguments.length;i++){ if(arguments[i]!=null && arguments[i]!=='') return arguments[i]; } return null; }
   function openRow(id){
+    var target=null; P.forEach(function(q){ if(q.id===id) target=q; });
+    if(target && !inView(target)) resetView();   /* zoomed elsewhere: zoom back out so its row exists */
     openId=id; render();
     var node=rowsEl.querySelector('[aria-expanded="true"]'); if(node) node.scrollIntoView({block:'center',behavior:'smooth'});
   }
