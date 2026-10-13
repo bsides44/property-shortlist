@@ -11,7 +11,7 @@ def build():
     data = json.load(open(os.path.join(HERE, "data.json"), encoding="utf-8"))
     # fields the viewer never reads are dropped to keep the payload small
     for p in data.get("properties", []):
-        for k in ("img", "constrCode", "councilAddress"):
+        for k in ("constrCode", "councilAddress"):
             p.pop(k, None)
     geo = open(os.path.join(HERE, "geo.json"), encoding="utf-8").read().strip()
     out = (tpl.replace("__SRC__", data.get("sourceUrl", ""))

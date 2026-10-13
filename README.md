@@ -11,7 +11,8 @@ double-glazing / renovation scan of the listing text, rebuilds the page and comm
 New qualifying houses appear automatically; sold ones drop off.
 
 Open `nelson_shortlist.html` (or the GitHub Pages `index.html`) in any browser. It is
-fully self-contained — all data and map geometry are embedded, no server needed at view time.
+self-contained — all data and map geometry are embedded, no server needed at view time.
+Listing photos are the one thing loaded over the network; offline, rows show no photo.
 
 ---
 
@@ -22,6 +23,7 @@ fully self-contained — all data and map geometry are embedded, no server neede
 | `crawl.py` | **The engine.** Discovers Nelson listings via realestate.co.nz's search API and enriches each (hazards + homes.co.nz + description scan) into `data.json`. |
 | `build_html.py` | Injects `data.json` + `geo.json` into the template → `nelson_shortlist.html` + `index.html`. |
 | `.github/workflows/update.yml` | Daily cron that runs the two scripts and commits the result. |
+| `serve.py` | Optional local server (`python3 serve.py`, then http://localhost:8000). Serves the viewer and relays homes.co.nz lookups so "Add a property" can fill in age and valuation. |
 | `requirements.txt` | Python deps for the BRANZ zone lookup only (`mapbox-vector-tile`, `shapely`, `pyproj`); the rest of the crawl is stdlib. |
 | `app_template.html` | App source. Contains `__DATA__`, `__GEO__` and `__SRC__` placeholders. |
 | `nelson_shortlist.html` / `index.html` | The built, self-contained app (identical; `index.html` is for Pages). |
@@ -65,9 +67,34 @@ rather not host it, just `git pull` and open `nelson_shortlist.html` locally.
 ### Tuning
 
 The filter and cadence live at the top of `crawl.py` (`MIN_BEDS`, `MIN_FLOOR`, `MIN_LAND`,
-`RE_DISTRICT`, `MAX_NEW_PER_RUN`) and in the workflow's `cron`. A manual "add this one
-listing" path isn't wired up, but a listing outside the filter can be included by loosening
-these constants.
+`RE_DISTRICT`, `MAX_NEW_PER_RUN`) and in the workflow's `cron`.
+
+**Northern cut-off.** Marybank and everything beyond it is left out: `EXCLUDE_SUBURBS`
+(Marybank, Todds Valley, Hira, Glenduan, Wakapuaka, Cable Bay) plus `NORTH_LIMIT_LAT`, a
+latitude line just south of Marybank that also catches listings addressed as "Atawhai" but
+level with or north of it (Atawhai Downs, upper Atawhai Drive). Atawhai proper stays.
+
+### Adding one listing by hand
+
+The ➕ button beside the search box adds a property to *your browser only* (localStorage).
+Give it an address or a realestate.co.nz link and it:
+
+1. finds the listing through realestate.co.nz's search API (`filter[address][]=<number and
+   street>`, or `/listings/<id>` from a pasted link) and fills in price, listed date, beds,
+   baths, floor and land area, photo, and the renovation / double-glazing scan. Anything
+   typed into the form wins over what it finds;
+2. runs every council hazard layer against the point;
+3. works out the nearest schools, cafés and supermarkets from the coordinates;
+4. pulls decade built, construction, council valuation and last sale from homes.co.nz.
+
+Step 4 needs `python3 serve.py`: homes.co.nz sends no CORS headers, so a browser can't call
+it and `serve.py` relays it at `/homes/…`. On the published GitHub Pages site there is no
+relay, so those fields stay blank for hand-added properties (crawled ones are unaffected —
+the crawler fetches them server-side). BRANZ wind / corrosion zones are also crawler-only.
+
+Matching is strict: street number (with any unit or letter) and street name must match
+exactly, since both sites' address searches are fuzzy; "St" for "Street" is fine. A listing
+the crawler already tracks is opened rather than added twice.
 
 ---
 
@@ -88,7 +115,8 @@ GET https://platform.realestate.co.nz/search/v1/listings
 
 Each `data[]` item's `attributes` already carry everything we filter and display —
 `bedroom-count`, `floor-area`, `land-area`, `price-display`, `published-date`,
-`description`, and `address.latitude/longitude`. The hard filter (3+ bed, 120 m²+ floor,
+`description`, `photos` (the first one becomes the row thumbnail) and
+`address.latitude/longitude`. The hard filter (3+ bed, 120 m²+ floor,
 250 m²+ land) is applied in `crawl.py`; the coordinates feed the hazard queries directly,
 so homes.co.nz's fuzzy address search never has to guess which house we mean.
 
@@ -236,7 +264,8 @@ open('nelson_shortlist.html', 'w', encoding='utf-8').write(out)
 - 2130 layers are projections under a stated climate scenario, not forecasts.
 - Outside every hazard polygon means outside *these* polygons. It is not a geotech report,
   and says nothing about overland flow or stormwater capacity.
-- Listing photos are referenced but not displayed — they live on Trade Me's CDN.
+- Listing thumbnails are hotlinked from realestate.co.nz's image server, not embedded. If a
+  photo is missing or stops loading, the row shows no image.
 
 ## Verification performed
 

@@ -34,6 +34,11 @@ MIN_LAND      = 250                       # m^2
 # comes back under the Nelson district).
 CENTRE        = (-41.2930, 173.2440)      # Tahunanui, Nelson (lat, lon)
 RADIUS_KM     = 15
+# northern cut-off: nothing in Marybank or beyond it. The latitude line sits just
+# south of Marybank, so it also catches listings addressed as "Atawhai" that are
+# level with or north of it (Atawhai Downs, upper Atawhai Drive); Atawhai proper stays.
+EXCLUDE_SUBURBS = {"marybank", "todds valley", "hira", "glenduan", "wakapuaka", "cable bay"}
+NORTH_LIMIT_LAT = -41.2310
 MAX_NEW_PER_RUN = int(os.environ.get("CRAWL_MAX_NEW", "40"))   # enrichments per run
 PRUNE_MIN_DISCOVERED = 20                 # only drop "gone" listings if discovery looked healthy
 REQUEST_DELAY = float(os.environ.get("CRAWL_HOMES_DELAY", "1.0"))  # seconds between homes.co.nz requests
@@ -379,6 +384,17 @@ def _int(v):
     except (TypeError, ValueError):
         return None
 
+IMG_HOST = "https://mediaserver.realestate.co.nz"
+
+def lead_photo(a):
+    """URL of the listing's first photo, or None. The image server crops to any
+    size named in the URL; the viewer swaps in a smaller crop for desktop rows."""
+    for ph in a.get("photos") or []:
+        base = ph.get("base-url") or ""
+        if re.fullmatch(r"/listings/[\w/-]+", base):
+            return IMG_HOST + base + ".crop.504x336.jpg"
+    return None
+
 def parse_api(item):
     """Turn one realestate.co.nz search-API listing into our property record."""
     a = item.get("attributes", {})
@@ -409,6 +425,7 @@ def parse_api(item):
         priceText=price_txt,
         ask=ask,
         listed=(a.get("published-date") or "")[:10],
+        img=lead_photo(a),
         _desc=strip_html(a.get("description")),
     )
 
@@ -444,11 +461,17 @@ def km_from(lat, lon, centre=CENTRE):
          math.cos(math.radians(centre[0])) * math.cos(math.radians(lat)) * math.sin(dlon / 2) ** 2)
     return 2 * R * math.asin(math.sqrt(a))
 
+def too_far_north(p):
+    parts = [x.strip().lower() for x in p.get("address", "").split(",")]
+    suburb = parts[-2] if len(parts) >= 2 else ""
+    return suburb in EXCLUDE_SUBURBS or p["lat"] > NORTH_LIMIT_LAT
+
 def qualifies(p):
     if p["beds"] is None or p["beds"] < MIN_BEDS:   return False
     if p["floor"] is None or p["floor"] < MIN_FLOOR: return False
     if p["land"] is None or p["land"] < MIN_LAND:   return False
     if km_from(p["lat"], p["lon"]) > RADIUS_KM:     return False
+    if too_far_north(p):                            return False
     return True
 
 def enrich(p):
@@ -521,6 +544,7 @@ def main():
         if lid in live:
             p["priceText"] = live[lid]["priceText"] or p.get("priceText", "")
             p["ask"] = live[lid]["ask"] if live[lid]["ask"] is not None else p.get("ask")
+            p["img"] = live[lid].get("img")          # lead photo can change; free with discovery
             reno, glaz, ev = scan_description(live[lid].get("_desc", ""))
             p["reno"], p["dblGlaz"], p["featEvidence"], p["descScanned"] = reno, glaz, ev, True
 

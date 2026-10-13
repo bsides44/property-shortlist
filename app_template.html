@@ -146,6 +146,11 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
 .row[aria-expanded="true"]{border-color:var(--accent);background:var(--surface-2)}
 .rank{display:flex;flex-direction:column;align-items:center;gap:5px;font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
 .rank input{accent-color:var(--accent);margin:0;cursor:pointer}
+/* listing photo: only rows that have one get the extra column */
+.row.hasimg{grid-template-columns:30px 88px minmax(0,1fr) auto}
+.row.hasimg .addr,.row.hasimg .sub,.row.hasimg .chips{grid-column:3}
+.row.hasimg .metric{grid-column:4}
+.thumb{grid-column:2;grid-row:1/4;align-self:start;width:88px;height:64px;object-fit:cover;border-radius:4px;background:var(--surface-2)}
 .row.mapoff{opacity:.5}
 .row.mapoff .addr{text-decoration:line-through;text-decoration-color:var(--line)}
 .addr{font-weight:600;font-size:15px;line-height:1.3}
@@ -244,6 +249,13 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
   .listhead h2{font-size:14px}
   .listhead .count{font-size:13px}
   .row{padding:14px 14px;grid-template-columns:40px minmax(0,1fr) auto;column-gap:12px}
+  /* photo sits on top, text stacks underneath it */
+  .row.hasimg{grid-template-columns:40px minmax(0,1fr) auto}
+  .row.hasimg .thumb{grid-column:2/-1;grid-row:1;width:100%;height:auto;aspect-ratio:3/2;margin-bottom:10px}
+  .row.hasimg .addr{grid-column:2;grid-row:2}
+  .row.hasimg .sub{grid-column:2;grid-row:3}
+  .row.hasimg .chips{grid-column:2;grid-row:4}
+  .row.hasimg .metric{grid-column:3;grid-row:2/4}
   .rank{font-size:14px;gap:8px}
   .rank input{width:26px;height:26px}
   .addr{font-size:17px}
@@ -377,10 +389,10 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
 
     <div>
       <div class="addpanel" id="addPanel" hidden>
-        <label class="afield">Address <span class="areq">*</span>
+        <label class="afield">Address <span class="aopt">(or just paste a realestate.co.nz link below)</span>
           <input type="text" id="aAddr" placeholder="e.g. 12 Example Street, Stoke" autocomplete="off"></label>
         <label class="afield">Listing link <span class="aopt">(optional)</span>
-          <input type="url" id="aUrl" placeholder="https://…" autocomplete="off"></label>
+          <input type="url" id="aUrl" placeholder="realestate.co.nz listing URL, or any link" autocomplete="off"></label>
         <div class="agrid">
           <label class="afield">Beds<input type="number" id="aBeds" min="0" step="1"></label>
           <label class="afield">Baths<input type="number" id="aBaths" min="0" step="1"></label>
@@ -396,7 +408,7 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
           <button type="button" class="ghost" id="aCancel">Cancel</button>
           <span class="astatus" id="aStatus" role="status" aria-live="polite"></span>
         </div>
-        <p class="anote">Added properties are saved in this browser only — they aren't shared. Hazards and nearby places are looked up live; age / capital value aren't available for manual adds.</p>
+        <p class="anote">Only the address (or a realestate.co.nz link) is needed. The listing is looked up on realestate.co.nz to fill in price, beds, baths, floor and land area, photo and the renovation / double-glazing scan; anything you type above wins over what it finds. Hazards and nearby places are looked up live. Decade built, construction and council valuation come from homes.co.nz, which only works when the page is opened through <code>python3 serve.py</code>, not on the published site. Added properties are saved in this browser only.</p>
       </div>
       <div class="searchAndAdd">
         <input type="search" id="search" class="search" placeholder="Search address or suburb…" aria-label="Search properties by address or suburb" autocomplete="off">
@@ -680,11 +692,15 @@ var drag=null, panMoved=false;
 function unitsPerPx(){ return view.w/(svg.clientWidth||svg.getBoundingClientRect().width||VB.w); }
 svg.addEventListener('pointerdown',function(e){
   drag={x:e.clientX,y:e.clientY,vx:view.x,vy:view.y}; panMoved=false;
-  try{ svg.setPointerCapture(e.pointerId); }catch(_){}
 });
 svg.addEventListener('pointermove',function(e){
   if(!drag) return;
-  if(!panMoved && Math.abs(e.clientX-drag.x)+Math.abs(e.clientY-drag.y)>4){ panMoved=true; svg.classList.add('grabbing'); }
+  if(!panMoved && Math.abs(e.clientX-drag.x)+Math.abs(e.clientY-drag.y)>4){
+    panMoved=true; svg.classList.add('grabbing');
+    /* capture only once a drag has really started: capturing on pointerdown
+       retargets a mouse click to the svg, so a dot never saw its own click */
+    try{ svg.setPointerCapture(e.pointerId); }catch(_){}
+  }
   if(panMoved){
     var upp=unitsPerPx();
     view.x=drag.vx-(e.clientX-drag.x)*upp;
@@ -880,6 +896,15 @@ function syncRefVisibility(){
   document.getElementById('refField').hidden = document.getElementById('rank').value!=='distance';
 }
 
+/* Listing photos are hotlinked from realestate.co.nz's image server: a small crop in
+   the desktop list, the full one when stacked on mobile. A property with no photo,
+   or whose photo fails to load, simply gets no thumbnail. */
+var noImg={};
+function thumbFor(p){
+  if(!p.img || noImg[p.id] || !/^https:\/\/mediaserver\.realestate\.co\.nz\/listings\/[\w\/.-]+$/.test(p.img)) return null;
+  return p.img.replace('.crop.504x336.','.crop.176x128.');
+}
+
 function render(){
   syncRefVisibility();
   var mode=document.getElementById('rank').value;
@@ -903,7 +928,10 @@ function render(){
     var hz=chipsFor(p);
     if((wl>=2||cl>=2) && hz.length===1 && hz[0][0]==='ok') hz=[];   /* high wind / highest corrosion counts as a flag, so drop "Nothing flagged" */
     var chips=(p.userAdded?'<span class="chip mine">Added by you</span>':'')+hz.map(function(c){return '<span class="chip '+c[0]+'">'+c[1]+'</span>'}).join('')+zchips+fchips;
+    var thumb=thumbFor(p);
+    if(thumb) li.classList.add('hasimg');
     li.innerHTML='<span class="rank"><input type="checkbox" class="mapchk" '+(hidden[p.id]?'':'checked')+' aria-label="Show this property on the map">'+(i+1)+'</span>'
+      +(thumb?'<img class="thumb" src="'+thumb+'" srcset="'+thumb+' 176w, '+p.img+' 504w" sizes="(max-width:640px) 100vw, 88px" alt="" loading="lazy" referrerpolicy="no-referrer">':'')
       +'<span class="addr">'+p.address.replace(/, Nelson$/,'')+'</span>'
       +'<span class="metric"><b>'+m[0]+'</b><span>'+m[1]+'</span>'+(m[2]?'<span class="walk">'+m[2]+'</span>':'')+'</span>'
       +'<span class="sub"><b>'+dec(p)+'</b><span>'+(p.priceText||'')+'</span><b>'+(p.beds!=null?p.beds:'—')+'</b><span>bd</span><b>'+(p.land!=null?p.land:'—')+'</b><span>m² land</span></span>'
@@ -911,6 +939,8 @@ function render(){
       +(openId===p.id?detailHTML(p):'');
     li.addEventListener('click',function(e){ if(e.target.closest('a')||e.target.classList.contains('mapchk')) return; select(p.id); });
     li.addEventListener('keydown',function(e){ if(e.target.classList.contains('mapchk')) return; if(e.key==='Enter'||e.key===' '){ e.preventDefault(); select(p.id); }});
+    var im=li.querySelector('.thumb');
+    if(im) im.addEventListener('error',function(){ noImg[p.id]=true; im.remove(); li.classList.remove('hasimg'); });
     var chk=li.querySelector('.mapchk');
     chk.addEventListener('click',function(e){ e.stopPropagation(); });
     chk.addEventListener('change',function(e){
@@ -981,7 +1011,9 @@ function select(id, scroll){
   setup('fLand',  lR.min,  lR.max, 10,   lR.min);
   setup('fFloor', flR.min, flR.max, 5,   flR.min);
   setup('fBeds',  bR.min,  bR.max, 1,    bR.min);
-  F.built=dR.min; F.price=pR.max; F.land=lR.min; F.floor=flR.min; F.beds=bR.min;
+  /* a range slider resting at its open end is "no bound" (null), so a property you
+     add from outside the crawled range (smaller floor, dearer) isn't filtered out */
+  F.built=F.price=F.land=F.floor=F.beds=null;
   /* ordinal risk/zone sliders on the full scale; top position = "Any" (no filter, the default) */
   var slM=SLOPE_LBL.length-1, lqM=LIQ_LBL.length-1, wnM=WIND_LBL.length-1, crM=CORR_LBL.length-1, ftM=FAULT_LBL.length-1;
   setup('fSlopeMax', 0, slM, 1, slM);
@@ -1005,9 +1037,13 @@ function select(id, scroll){
     document.getElementById('vFault').textContent = ordLbl('fFault', FAULT_LBL);
   }
   labels();
-  [['fBuilt','built'],['fPrice','price'],['fLand','land'],['fFloor','floor'],['fBeds','beds'],
+  [['fBuilt','built','min'],['fPrice','price','max'],['fLand','land','min'],['fFloor','floor','min'],['fBeds','beds','min'],
    ['fSlopeMax','slope'],['fLiq','liq'],['fWind','wind'],['fCorr','corr'],['fFault','fault']].forEach(function(m){
-    document.getElementById(m[0]).addEventListener('input',function(){ F[m[1]]=+this.value; labels(); render(); });
+    document.getElementById(m[0]).addEventListener('input',function(){
+      var v=+this.value;
+      F[m[1]] = (m[2] && v===+this[m[2]]) ? null : v;
+      labels(); render();
+    });
   });
 
   var btn=document.getElementById('moreBtn'), panel=document.getElementById('morePanel');
@@ -1094,6 +1130,132 @@ function select(id, scroll){
   }
   function numOr(id){ var v=document.getElementById(id).value.trim(); return (v===''||isNaN(+v))?null:+v; }
 
+  /* ---------- listing + property-record lookups ----------
+     realestate.co.nz's search API is public and CORS-open, so the page calls it
+     directly. homes.co.nz is not, so those calls go through the /homes/ relay in
+     serve.py and are skipped (fields stay blank) wherever that isn't running,
+     which includes the published GitHub Pages site. Only derived facts are kept;
+     the marketing description is scanned, never stored. */
+  var RE_API='https://platform.realestate.co.nz/search/v1/listings';
+  var RE_IMG='https://mediaserver.realestate.co.nz';
+  var ENRICH_V=1;
+  var CONSTR={WI:'Wood, iron roof',WT:'Wood, tile roof',WF:'Wood, flat roof',BI:'Brick, iron roof',BT:'Brick, tile roof',
+    RI:'Roughcast, iron roof',RT:'Roughcast, tile roof',FI:'Fibre cement, iron roof',FT:'Fibre cement, tile roof',
+    CT:'Concrete, tile roof',CI:'Concrete, iron roof',XF:'Mixed materials, flat roof',XI:'Mixed materials, iron roof',
+    XT:'Mixed materials, tile roof'};   /* mirrors CONSTR in crawl.py */
+  var ST_ABBR={st:'street',rd:'road',ave:'avenue',av:'avenue',dr:'drive',pl:'place',cres:'crescent',cr:'crescent',
+    tce:'terrace',ter:'terrace',ln:'lane',ct:'court',hwy:'highway',pde:'parade',gr:'grove',cl:'close',sq:'square'};
+  /* text from other sites ends up in innerHTML, so drop any markup first */
+  function clean(s){ return String(s==null?'':s).replace(/<[^>]*>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/[<>"]/g,'').replace(/\s+/g,' ').trim(); }
+  function posInt(v){ v=Math.round(parseFloat(v)); return (isFinite(v) && v>0) ? v : null; }
+  /* "5a Orakei St, Nelson" -> "5a orakei street": the part that must match exactly.
+     Address search on both sites is fuzzy enough to hand back 5A for 5. */
+  function streetKey(addr){
+    var seg=String(addr||'').split(',')[0].toLowerCase().replace(/\./g,'').replace(/\s*\/\s*/g,'/').replace(/\s+/g,' ').trim();
+    var w=seg.split(' '), last=w[w.length-1];
+    if(w.length>2 && ST_ABBR[last]) w[w.length-1]=ST_ABBR[last];
+    return w.join(' ');
+  }
+  function titleCase(s){ return s.replace(/(^|[\s\/-])([a-z])/g,function(m,a,b){return a+b.toUpperCase();}); }
+  /* the words typed after the street, e.g. ["stoke","nelson"] */
+  function localityWords(addr){
+    return String(addr||'').split(',').slice(1).join(' ').toLowerCase().split(/[^a-zāēīōū]+/).filter(function(w){return w.length>2 && w!=='new' && w!=='zealand';});
+  }
+  function getJSON(url){
+    return fetch(url,{headers:{'Accept':'application/json'}}).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); });
+  }
+  /* find the listing: by id if a realestate.co.nz link was pasted, else by address */
+  function reFind(addr, reId){
+    if(reId) return getJSON(RE_API+'/'+reId).then(function(j){ return j && j.data && j.data.attributes ? j.data : null; });
+    var key=streetKey(addr); if(!key) return Promise.resolve(null);
+    var q=RE_API+'?page[limit]=30&filter[address][]='+encodeURIComponent(titleCase(key))
+         +['res_sale','lifestyle_sale','rural_sale'].map(function(c){return '&filter[category][]='+c;}).join('');
+    return getJSON(q).then(function(j){
+      var hits=(j.data||[]).filter(function(x){ return streetKey((x.attributes.address||{})['full-address'])===key; });
+      if(!hits.length) return null;
+      /* the same street address exists in several towns: use the suburb/town typed, else stay local */
+      var words=localityWords(addr);
+      var scored=hits.map(function(x){
+        var A=x.attributes.address||{};
+        var loc=[A.suburb,A['publish-suburb'],A['suburb-display'],A.district].join(' ').toLowerCase();
+        return {x:x, n:words.filter(function(w){return loc.indexOf(w)>=0;}).length, local:A['region-slug']==='nelson-bays'};
+      });
+      var pool=scored.filter(function(c){return c.local;});
+      if(!pool.length && words.length) pool=scored.filter(function(c){return c.n>0;});
+      pool.sort(function(a,b){return b.n-a.n;});
+      if(!pool.length || (pool.length>1 && pool[0].n===pool[1].n)) return null;
+      return pool[0].x;
+    });
+  }
+  function reFields(x){
+    var a=x.attributes, A=a.address||{}, o={reId:String(x.id)};
+    /* same address shape as crawl.py: "<number> <street>, <Suburb>, Nelson" */
+    var num=clean(A['street-number'])+clean(A['street-number-suffix']), unit=clean(A['unit-number']);
+    var street=clean(A['street-name']||A.street), suburb=titleCase(clean(A['suburb-slug']).replace(/-/g,' '));
+    var first=clean(String(A['full-address']||'').split(',')[0]) || ((unit?unit+'/':'')+num+' '+street).trim();
+    if(first) o.address=[first,suburb,clean(A.district)].filter(Boolean).join(', ');
+    var lat=parseFloat(A.latitude), lon=parseFloat(A.longitude);
+    if(isFinite(lat)&&isFinite(lon)){ o.lat=lat; o.lon=lon; }
+    o.priceText=clean(a['price-display']);
+    var m=o.priceText.match(/\$([\d,]{5,})/); o.ask = m ? parseInt(m[1].replace(/,/g,''),10) : null;
+    o.beds=posInt(a['bedroom-count']); o.baths=posInt(a['bathrooms-total-count']);
+    o.parking=posInt(a['parking-garage-count']);
+    o.floor=posInt(a['floor-area']);
+    var land=parseFloat(a['land-area']);
+    if(isFinite(land) && land>0) o.land=Math.round(/^ha/i.test(a['land-area-unit']||'') ? land*10000 : land);
+    if(/^\d{4}-\d\d-\d\d/.test(a['published-date']||'')) o.listed=a['published-date'].slice(0,10);
+    var ph=(a.photos||[])[0];
+    if(ph && /^\/listings\/[\w\/-]+$/.test(ph['base-url']||'')) o.img=RE_IMG+ph['base-url']+'.crop.504x336.jpg';
+    if(/^https:\/\/www\.realestate\.co\.nz\/[\w\/-]+$/.test(a['website-full-url']||'')) o.url=a['website-full-url'];
+    o.desc=clean(a.header)+'. '+clean(a.description)+'. '+(a['other-features']||[]).map(function(f){return clean(f.heading)+' '+clean(f.value);}).join('. ');
+    return o;
+  }
+  /* homes.co.nz council record, via the serve.py relay */
+  function homesFind(addr){
+    if(!/^https?:$/.test(location.protocol)) return Promise.reject(new Error('no relay'));
+    var key=streetKey(addr), words=localityWords(addr);
+    return getJSON('homes/address/search?Address='+encodeURIComponent(addr)).then(function(j){
+      var hits=((j&&j.Results)||[]).filter(function(r){ return r.PropertyID && streetKey(r.Title)===key; });
+      if(words.length && hits.length>1){
+        var loc=hits.filter(function(r){ var t=String(r.Title).toLowerCase(); return words.some(function(w){return t.indexOf(w)>=0;}); });
+        if(loc.length) hits=loc;
+      }
+      if(!hits.length) return null;
+      var r=hits[0], pid=r.PropertyID;
+      return Promise.all([
+        getJSON('homes/properties?property_ids='+encodeURIComponent(pid)).catch(function(){return null;}),
+        getJSON('homes/property/'+encodeURIComponent(pid)+'/timeline').catch(function(){return null;})
+      ]).then(function(res){
+        var card=(res[0]&&res[0].cards&&res[0].cards[0])||{}, d=card.property_details||{}, ev=(res[1]&&res[1].events)||[];
+        var o={title:clean(r.Title)};
+        if(isFinite(r.Lat)&&isFinite(r.Long)&&r.Lat&&r.Long){ o.lat=r.Lat; o.lon=r.Long; }
+        var dec=parseInt(d.decade_built,10); o.decade = (dec>1800&&dec<2100) ? dec : null;
+        o.constr=CONSTR[d.building_construction]||null;
+        o.beds=posInt(d.num_bedrooms); o.baths=posInt(d.num_bathrooms);
+        o.floor=posInt(d.floor_area); o.land=posInt(d.land_area);
+        var val=null, sale=null;
+        ev.forEach(function(e){ if(!val&&e.key==='valuation') val=e; if(!sale&&e.key==='property_sale') sale=e; });
+        var vd=(val&&val.data)||{};
+        o.cv=posInt(vd.capital_value)||posInt(d.capital_value);
+        o.landValue=posInt(vd.land_value)||posInt(d.land_value);
+        o.improvValue=posInt(vd.improvement_value)||posInt(d.improvement_value);
+        if(sale){ o.lastSale=posInt(sale.data&&sale.data.price); o.lastSaleDate=/^\d{4}-\d\d-\d\d/.test(sale.date||'')?sale.date.slice(0,10):null; }
+        return o;
+      });
+    });
+  }
+  /* Run the listing and council-record lookups for one address. Resolves with
+     {re, homes, found}; either source may be null. */
+  function lookup(addr, reId, say){
+    var out={re:null, homes:null, homesTried:true};
+    say('Searching realestate.co.nz…');
+    return reFind(addr, reId).catch(function(){return null;}).then(function(x){
+      if(x) out.re=reFields(x);
+      say(out.re?'Found the listing. Checking council records…':'No realestate.co.nz listing matched. Checking council records…');
+      return homesFind((out.re&&out.re.address)||addr).catch(function(){ out.homesTried=false; return null; });
+    }).then(function(h){ out.homes=h; return out; });
+  }
+
   var panel=document.getElementById('addPanel'), addBtn=document.getElementById('addBtn'),
       statusEl=document.getElementById('aStatus'), submit=document.getElementById('aSubmit');
   function setStatus(msg,cls){ statusEl.textContent=msg||''; statusEl.className='astatus'+(cls?' '+cls:''); }
@@ -1108,34 +1270,75 @@ function select(id, scroll){
   });
   document.getElementById('aCancel').addEventListener('click',function(){ toggle(false); setStatus(''); });
 
+  function first(){ for(var i=0;i<arguments.length;i++){ if(arguments[i]!=null && arguments[i]!=='') return arguments[i]; } return null; }
+  function openRow(id){
+    openId=id; render();
+    var node=rowsEl.querySelector('[aria-expanded="true"]'); if(node) node.scrollIntoView({block:'center',behavior:'smooth'});
+  }
   submit.addEventListener('click',function(){
-    var addr=document.getElementById('aAddr').value.trim();
-    if(!addr){ setStatus('Enter an address','err'); return; }
-    submit.disabled=true; setStatus('Finding address…');
-    geocode(addr).then(function(coords){
-      if(!coords){ setStatus('Couldn’t find that address — check the spelling','err'); submit.disabled=false; return; }
-      setStatus('Checking council hazards…');
-      return scanHazards(coords.lat,coords.lon).then(function(hz){
-        var price=document.getElementById('aPrice').value.trim(), ask=null, m=/\$([\d,]+)/.exec(price);
-        if(m) ask=+m[1].replace(/,/g,'');
-        var descVal=document.getElementById('aDesc').value.trim(), sc=scanDesc(descVal);
-        var flagged=hz.hazards.filter(function(h){return h.rank>0;});
-        var p={ id:'user-'+Date.now(), userAdded:true, address:addr, url:document.getElementById('aUrl').value.trim(),
-          lat:coords.lat, lon:coords.lon, beds:numOr('aBeds'), baths:numOr('aBaths'), parking:null,
-          floor:numOr('aFloor'), land:numOr('aLand'), priceText:price, ask:ask, listed:'',
-          outsideCoverage:hz.outsideCoverage, hazards:hz.hazards,
-          hazardScore:flagged.reduce(function(s,h){return s+h.rank;},0), hazardCount:flagged.length,
-          decade:null, constr:null, cv:null, landValue:null, improvValue:null, lastSale:null, lastSaleDate:null,
-          reno:sc.reno, dblGlaz:sc.glaz, featEvidence:sc.evidence, descScanned:!!descVal, windZone:null, corrosionZone:null };
-        p.sev=severity(p);
-        P.push(p); makeDot(p); saveUserProps();
-        ['aAddr','aUrl','aBeds','aBaths','aFloor','aLand','aPrice','aDesc'].forEach(function(id){ document.getElementById(id).value=''; });
-        submit.disabled=false; toggle(false); setStatus('');
-        openId=p.id; render();
-        var node=rowsEl.querySelector('[aria-expanded="true"]'); if(node) node.scrollIntoView({block:'center',behavior:'smooth'});
+    var addr=clean(document.getElementById('aAddr').value), link=document.getElementById('aUrl').value.trim();
+    var reId=(link.match(/realestate\.co\.nz\/(\d+)(?:\/|$)/)||[])[1] || null;
+    if(!addr && !reId){ setStatus('Enter an address, or paste a realestate.co.nz link','err'); return; }
+    if(link && !/^https?:\/\/[^\s<>"']+$/i.test(link)){ setStatus('That link doesn’t look like a web address','err'); return; }
+    submit.disabled=true;
+    lookup(addr, reId, setStatus).then(function(found){
+      var re=found.re||{}, h=found.homes||{};
+      /* the crawler's ids are realestate.co.nz ids, so a listing already tracked is easy to spot */
+      var address=re.address||addr||h.title, key=streetKey(address);
+      var dup=null;
+      P.forEach(function(q){ if(!dup && ((re.reId && (q.id===re.reId || q.reId===re.reId)) || (re.lat!=null && streetKey(q.address)===key && dist(q.lat,q.lon,re.lat,re.lon)<0.4))) dup=q; });
+      if(dup){ submit.disabled=false; toggle(false); setStatus(''); openRow(dup.id); return; }   /* already listed: just show it */
+      setStatus('Finding address…');
+      var where=(re.lat!=null) ? Promise.resolve({lat:re.lat,lon:re.lon})
+              : (h.lat!=null) ? Promise.resolve({lat:h.lat,lon:h.lon}) : geocode(address);
+      return where.then(function(coords){
+        if(!coords){ setStatus('Couldn’t find that address — check the spelling','err'); submit.disabled=false; return; }
+        setStatus('Checking council hazards…');
+        return scanHazards(coords.lat,coords.lon).then(function(hz){
+          var price=first(document.getElementById('aPrice').value.trim(), re.priceText)||'', ask=null, m=/\$([\d,]+)/.exec(price);
+          if(m) ask=+m[1].replace(/,/g,'');
+          var typed=document.getElementById('aDesc').value.trim(), descVal=(typed+' '+(re.desc||'')).trim(), sc=scanDesc(descVal);
+          var flagged=hz.hazards.filter(function(h){return h.rank>0;});
+          var p={ id:'user-'+Date.now(), userAdded:true, enrichV:ENRICH_V, reId:re.reId||null, address:address,
+            url:first(link, re.url)||'', img:re.img||null,
+            lat:coords.lat, lon:coords.lon,
+            beds:first(numOr('aBeds'),re.beds,h.beds), baths:first(numOr('aBaths'),re.baths,h.baths), parking:first(re.parking),
+            floor:first(numOr('aFloor'),re.floor,h.floor), land:first(numOr('aLand'),re.land,h.land),
+            priceText:price, ask:ask, listed:re.listed||'',
+            outsideCoverage:hz.outsideCoverage, hazards:hz.hazards,
+            hazardScore:flagged.reduce(function(s,h){return s+h.rank;},0), hazardCount:flagged.length,
+            decade:first(h.decade), constr:first(h.constr), cv:first(h.cv), landValue:first(h.landValue), improvValue:first(h.improvValue),
+            lastSale:first(h.lastSale), lastSaleDate:first(h.lastSaleDate),
+            reno:sc.reno, dblGlaz:sc.glaz, featEvidence:clean(sc.evidence), descScanned:!!descVal, windZone:null, corrosionZone:null };
+          p.sev=severity(p);
+          P.push(p); makeDot(p); saveUserProps();
+          ['aAddr','aUrl','aBeds','aBaths','aFloor','aLand','aPrice','aDesc'].forEach(function(id){ document.getElementById(id).value=''; });
+          submit.disabled=false; toggle(false); setStatus('');
+          openRow(p.id);
+        });
       });
     }).catch(function(){ setStatus('Something went wrong — try again','err'); submit.disabled=false; });
   });
+
+  /* properties added before the lookups existed get them once, filling blanks only */
+  (function(){
+    var old=P.filter(function(p){ return p.userAdded && !p.enrichV; });
+    old.reduce(function(chain,p){
+      return chain.then(function(){
+        var reId=(String(p.url||'').match(/realestate\.co\.nz\/(\d+)(?:\/|$)/)||[])[1] || null;
+        return lookup(p.address, reId, function(){}).then(function(found){
+          var re=found.re||{}, h=found.homes||{};
+          [['beds',re.beds,h.beds],['baths',re.baths,h.baths],['floor',re.floor,h.floor],['land',re.land,h.land],['parking',re.parking],
+           ['priceText',re.priceText],['ask',re.ask],['listed',re.listed],['img',re.img],['url',re.url],['reId',re.reId],
+           ['decade',h.decade],['constr',h.constr],['cv',h.cv],['landValue',h.landValue],['improvValue',h.improvValue],
+           ['lastSale',h.lastSale],['lastSaleDate',h.lastSaleDate]]
+            .forEach(function(m){ if(p[m[0]]==null || p[m[0]]===''){ var v=first(m[1],m[2]); if(v!=null) p[m[0]]=v; } });
+          if(!p.descScanned && re.desc){ var sc=scanDesc(re.desc); p.reno=sc.reno; p.dblGlaz=sc.glaz; p.featEvidence=clean(sc.evidence); p.descScanned=true; }
+          p.enrichV=ENRICH_V;
+        });
+      });
+    }, Promise.resolve()).then(function(){ if(old.length){ saveUserProps(); render(); } }).catch(function(){});
+  })();
 
   /* remove a browser-added property */
   rowsEl.addEventListener('click',function(e){
