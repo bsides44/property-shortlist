@@ -1,6 +1,6 @@
-name: Update Nelson shortlist
+name: Update property shortlist
 
-# Runs once a day: crawl realestate.co.nz for qualifying Nelson houses, enrich
+# Runs once a day: crawl realestate.co.nz for qualifying houses in each region, enrich
 # each with hazard / age / renovation data, rebuild the viewer, and commit the
 # result. One short run a day is far under the free Actions allowance (public
 # repos are unmetered; private repos get 2,000 min/month and this uses ~5-15).
@@ -48,6 +48,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes."
           else
-            git commit -m "Auto-update Nelson shortlist ($(date -u +%Y-%m-%d))"
+            git commit -m "Auto-update shortlist ($(date -u +%Y-%m-%d))"
             git push
           fi

@@ -1,6 +1,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Nelson Shortlist Hazard Map</title>
+<title>Property Shortlist Hazard Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;600;700&family=Public+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -59,6 +59,9 @@ header{border-bottom:1px solid var(--line);background:var(--surface);}
 h1{font-family:"Archivo Narrow",sans-serif;font-weight:700;font-size:clamp(26px,3.4vw,38px);line-height:1.05;margin:4px 0 0;letter-spacing:-.005em;text-wrap:balance}
 .src{font-size:12.5px;color:var(--muted);margin-top:6px}
 .src a{color:var(--accent)}
+.regions{display:flex;gap:6px;margin-top:10px}
+.regions button.ghost{width:auto;min-height:36px;padding:6px 14px}
+.regions button.ghost[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);font-weight:600}
 .rail{display:flex;gap:26px;flex-wrap:wrap}
 .stat{min-width:64px}
 .stat b{display:block;font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:23px;line-height:1.1;font-variant-numeric:tabular-nums}
@@ -282,9 +285,10 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
 <header>
   <div class="hdr">
     <div>
-      <div class="eyebrow">realestate.co.nz &middot; Nelson City Council hazard overlays</div>
-      <h1>Nelson Shortlist</h1>
-      <div class="src"><span id="srcCount"></span> &middot; <a href="__SRC__" target="_blank" rel="noopener">Nelson houses on realestate.co.nz &rarr;</a></div>
+      <div class="eyebrow" id="eyebrow"></div>
+      <h1 id="pageTitle">Shortlist</h1>
+      <div class="regions" id="regions" role="group" aria-label="Region"></div>
+      <div class="src"><span id="srcCount"></span> &middot; <a id="srcLink" href="#" target="_blank" rel="noopener"></a></div>
     </div>
     <div class="rail" id="rail"></div>
   </div>
@@ -372,7 +376,7 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
           <span class="scale" id="scalebar"></span>
         </div>
         <div class="mapview">
-          <svg class="map" id="map" viewBox="0 0 460 560" role="img" aria-label="Schematic map of Nelson showing shortlisted properties coloured by hazard exposure"></svg>
+          <svg class="map" id="map" viewBox="0 0 460 560" role="img" aria-label="Schematic map showing shortlisted properties coloured by hazard exposure"></svg>
           <div class="zoombtns">
             <button type="button" id="zin" aria-label="Zoom in">+</button>
             <button type="button" id="zout" aria-label="Zoom out">&minus;</button>
@@ -382,7 +386,7 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
           <span><i style="background:var(--high)"></i>Flood or multiple flags</span>
           <span><i style="background:var(--watch)"></i>One flag to check</span>
           <span><i style="background:var(--ok)"></i>Nothing flagged</span>
-          <span><i style="background:var(--none)"></i>Outside NCC coverage</span>
+          <span><i style="background:var(--none)"></i><span id="legNone">Outside NCC coverage</span></span>
         </div>
       </div>
     </div>
@@ -437,8 +441,10 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
       <p>Coastal and 2130 river layers are climate projections under a stated scenario, not forecasts.</p>
     </div>
     <div>
-      <h3>Adding another region</h3>
-      <p>Coverage here stops at the Nelson City Council boundary. Each council publishes its own hazard services, so a new region means pointing the same query at a new endpoint and mapping its layer names into the same severity scale.</p>
+      <h3>Regions</h3>
+      <p>The Nelson / Wellington switch under the title swaps the listings, map and nearby places. Wellington covers Wellington City, Porirua and the Kāpiti Coast as far as Paraparaumu.</p>
+      <p><b>Wellington hazards</b> come from four publishers: Greater Wellington Regional Council (regional liquefaction potential, earthquake-induced slope failure and tsunami evacuation zones) plus the district-plan overlays of Wellington City, Porirua and Kāpiti Coast (fault zones, flood hazard areas, coastal inundation and erosion). These are hazard <em>areas</em>, not modelled depths, and each council draws them differently, so compare within a council more confidently than across them. Tsunami zones are shown but not counted as a flag.</p>
+      <p>Hazard coverage for Nelson stops at the Nelson City Council boundary. Each council publishes its own hazard services, so a new region means pointing the same query at a new endpoint and mapping its layer names into the same severity scale.</p>
       <p>For your Wellington lists that means Greater Wellington Regional Council plus the relevant city council; for Richmond and Best Island, Tasman District Council.</p>
       <p class="src" style="margin-top:10px"><a href="https://experience.arcgis.com/experience/188c8d0a60d344ccbd80f8aa71c75184/page/River-Flooding" target="_blank" rel="noopener">Nelson City Council natural hazard maps &rarr;</a></p>
     </div>
@@ -451,12 +457,134 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
 (function(){
 "use strict";
 var DATA = JSON.parse(document.getElementById('data').textContent);
-var GEO  = JSON.parse(document.getElementById('geo').textContent);
-var POIS = DATA.pois;
+var GEOALL = JSON.parse(document.getElementById('geo').textContent);
+
+/* ---------- regions ----------
+   One page, several regions; the toggle under the title picks which one is shown.
+   Everything below (listings, places, map frame) is built for the chosen region
+   only, so switching simply reloads the page with the other region selected.
+     towns     trailing address parts dropped from the row title
+     bounds    map frame used when the region has no listings to fit to
+     wholeFrame  always include `bounds` in the frame, rather than fitting to the listings
+     minW      deepest zoom-in, as a fraction of the full map width
+     labels    [name, lat, lon, text-anchor, min zoom to show]
+     custom    personal reference points, pinned to the top of "A specific place"
+     bars      craft beer bars for "Nearest craft beer bar" (OpenStreetMap) */
+var REGIONS = {
+  nelson:{
+    label:'Nelson', hazards:'ncc', reSlug:'nelson-bays', centre:[-41.2930,173.2440],
+    eyebrow:'realestate.co.nz · Nelson City Council hazard overlays',
+    src:'https://www.realestate.co.nz/residential/sale/nelson-bays/nelson/house',
+    towns:['Nelson','Nelson City'], example:'12 Example Street, Stoke',
+    bounds:{n:-41.21,s:-41.35,w:173.19,e:173.34}, minW:0.28, cafesInPlaces:true,
+    labels:[['Atawhai',-41.2420,173.3150,'end'],['Marybank',-41.2270,173.3210,'end'],
+      ['The Wood',-41.2645,173.2950,'start'],['Nelson CBD',-41.2690,173.2820,'end'],
+      ['Maitai',-41.2800,173.3060,'start'],['Washington Valley',-41.2710,173.2670,'end'],
+      ['Nelson South',-41.2930,173.2790,'start'],['Tahunanui',-41.2930,173.2440,'middle'],
+      ['Wakatu',-41.3010,173.2560,'start'],['Stoke',-41.3220,173.2300,'middle'],
+      ['Best Island',-41.3070,173.1640,'start']],
+    custom:[
+      {n:"Aldinga Reserve", note:'Aldinga Reserve, Stoke',                    lat:-41.3113062, lon:173.2236205},
+      {n:"Brightwater church", note:"St Paul's Anglican church, Brightwater",    lat:-41.3703624, lon:173.1038358},
+      {n:'Nelson weekend market', note:'Montgomery Square',                  lat:-41.2733000, lon:173.2828000},
+      {n:'The Free House', note:'craft beer bar',                            lat:-41.2733148, lon:173.2874619}
+    ],
+    bars:[
+      {n:'The Free House',              lat:-41.2733148, lon:173.2874619},
+      {n:'Craft Beer Depot',            lat:-41.2713414, lon:173.2820581},
+      {n:'Two Thumbs Brewery',          lat:-41.2719025, lon:173.2865607},
+      {n:'Sprig + Fern Brewing Co.',    lat:-41.2744790, lon:173.2864905},
+      {n:'Eddyline Brewery, Richmond',  lat:-41.3324782, lon:173.2011256},
+      {n:'Sprig & Fern, Brightwater',   lat:-41.3763457, lon:173.1098989},
+      {n:'Sprig & Fern, Wakefield',     lat:-41.2529708, lon:173.0949969}
+    ]
+  },
+  wellington:{
+    label:'Wellington', hazards:'wgtn', reSlug:'wellington', centre:[-41.1100,174.8700],
+    eyebrow:'realestate.co.nz · Wellington to Paraparaumu · Greater Wellington, Wellington City, Porirua and Kāpiti hazard overlays',
+    src:'https://www.realestate.co.nz/residential/sale/wellington/house',
+    towns:['Wellington','Wellington City','Porirua','Porirua City','Kapiti Coast'], example:'12 Example Street, Karori',
+    bounds:{n:-40.86,s:-41.36,w:174.69,e:175.04}, wholeFrame:true, minW:0.07,
+    cafesInPlaces:false,          /* several hundred cafés: too many for the place list */
+    labels:[['Wellington CBD',-41.2866,174.7756,'start'],['Karori',-41.2850,174.7350,'middle'],
+      ['Miramar',-41.3150,174.8200,'start'],['Island Bay',-41.3370,174.7720,'middle'],
+      ['Johnsonville',-41.2230,174.8030,'end'],['Tawa',-41.1700,174.8280,'end'],
+      ['Porirua',-41.1340,174.8400,'end'],['Whitby',-41.1170,174.8950,'start'],
+      ['Plimmerton',-41.0800,174.8620,'end'],['Pukerua Bay',-41.0310,174.8880,'end'],
+      ['Paekākāriki',-40.9810,174.9570,'end'],['Raumati',-40.9280,174.9820,'end'],
+      ['Paraparaumu',-40.9140,175.0080,'start'],
+      ['Khandallah',-41.2470,174.7930,'middle',2.5],['Ngaio',-41.2490,174.7740,'end',2.5],
+      ['Churton Park',-41.2020,174.8060,'end',2.5],['Newlands',-41.2280,174.8220,'start',2.5],
+      ['Wadestown',-41.2630,174.7750,'middle',2.5],['Kelburn',-41.2850,174.7630,'end',2.5],
+      ['Brooklyn',-41.3070,174.7620,'end',2.5],['Newtown',-41.3130,174.7800,'middle',2.5],
+      ['Hataitai',-41.3050,174.7970,'start',2.5],['Kilbirnie',-41.3180,174.7950,'middle',2.5],
+      ['Seatoun',-41.3250,174.8320,'start',2.5],['Titahi Bay',-41.1050,174.8380,'end',2.5],
+      ['Paremata',-41.1050,174.8680,'start',2.5],['Aotea',-41.1280,174.8570,'middle',2.5],
+      ['Cannons Creek',-41.1420,174.8670,'start',2.5],
+      ['Paraparaumu Beach',-40.8900,174.9900,'end',2.5],['Otaihanga',-40.8800,175.0160,'start',2.5]],
+    custom:[
+      {n:'The Beehive',    note:'Parliament, Bowen Street',          lat:-41.2784446, lon:174.7766254},
+      {n:'Unity Books',    note:'57 Willis Street',                  lat:-41.2878535, lon:174.7756797},
+      {n:'Springload',     note:'7 Dixon Street, Te Aro',            lat:-41.2924160, lon:174.7783360},
+      {n:'Freyberg Beach', note:'Oriental Bay',                      lat:-41.2902500, lon:174.7901190},
+      {n:'Te Papa',        note:'Museum of New Zealand, Cable Street', lat:-41.2903320, lon:174.7819270}
+    ],
+    bars:[]
+  }
+};
+var REGION_KEY = 'nsl_region';
+var REGION = (function(){
+  var h=location.hash.replace('#','');
+  if(REGIONS[h]) return h;
+  try{ var s=localStorage.getItem(REGION_KEY); if(REGIONS[s]) return s; }catch(e){}
+  return 'nelson';
+})();
+var RC = REGIONS[REGION];
+function switchRegion(r){
+  try{ localStorage.setItem(REGION_KEY,r); }catch(e){}
+  location.hash=r; location.reload();
+}
+function regionOf(o){ return o.region||'nelson'; }      /* records from before regions existed are Nelson */
+function inRegion(o){ return regionOf(o)===REGION; }
+/* which region a point belongs to: the nearer region centre */
+function regionAt(lat,lon){
+  var best=null, bd=1e9;
+  Object.keys(REGIONS).forEach(function(k){
+    var c=REGIONS[k].centre, d=Math.pow(lat-c[0],2)+Math.pow(lon-c[1],2);
+    if(d<bd){ bd=d; best=k; }
+  });
+  return best;
+}
+var GEO  = GEOALL[REGION] || {coastline:[],river:[],road:[]};
+var POIS = (DATA.pois||[]).filter(inRegion);
 var USER_KEY = 'nsl_user_props_v1';
 function loadUserProps(){ try{ return JSON.parse(localStorage.getItem(USER_KEY)||'[]')||[]; }catch(e){ return []; } }
-function saveUserProps(){ try{ localStorage.setItem(USER_KEY, JSON.stringify(P.filter(function(p){return p.userAdded;}))); }catch(e){} }
-var P = DATA.properties.concat(loadUserProps());   /* browser-saved manual additions */
+var USER_ELSEWHERE = loadUserProps().filter(function(p){ return !inRegion(p); });   /* kept as-is when saving */
+function saveUserProps(){ try{ localStorage.setItem(USER_KEY, JSON.stringify(USER_ELSEWHERE.concat(P.filter(function(p){return p.userAdded;})))); }catch(e){} }
+var P = DATA.properties.filter(inRegion).concat(loadUserProps().filter(inRegion));   /* browser-saved manual additions */
+
+/* ---------- header: title, region toggle, source link ---------- */
+(function(){
+  document.title = RC.label+' Shortlist Hazard Map';
+  document.getElementById('pageTitle').textContent = RC.label+' Shortlist';
+  document.getElementById('eyebrow').textContent = RC.eyebrow;
+  var a=document.getElementById('srcLink'); a.href=RC.src; a.textContent=RC.label+' houses on realestate.co.nz →';
+  document.getElementById('legNone').textContent = RC.hazards==='ncc' ? 'Outside NCC coverage' : 'No council hazard data';
+  document.getElementById('aAddr').placeholder = 'e.g. '+RC.example;
+  var box=document.getElementById('regions');
+  Object.keys(REGIONS).forEach(function(k){
+    var b=document.createElement('button'); b.type='button'; b.className='ghost';
+    b.textContent=REGIONS[k].label; b.setAttribute('aria-pressed', k===REGION?'true':'false');
+    b.addEventListener('click',function(){ if(k!==REGION) switchRegion(k); });
+    box.appendChild(b);
+  });
+})();
+/* row title: the address without its trailing town */
+function shortAddr(p){
+  var a=p.address||'';
+  RC.towns.forEach(function(t){ var end=', '+t; if(a.slice(-end.length)===end) a=a.slice(0,-end.length); });
+  return a;
+}
 var hidden = {};                       /* property ids manually un-ticked in the list (removed from map) */
 var F = {built:null, price:null, land:null, floor:null, beds:null,
          slope:null, liq:null, wind:null, corr:null, fault:null};  /* "more filters" thresholds */
@@ -488,36 +616,18 @@ function fmtWalk(km){ var min=Math.max(1,Math.round(km/4.5*60)); return '≈ '+m
 var TYPE_LABEL = {primary:'primary school', intermediate:'intermediate school', secondary:'secondary school',
                   kindergarten:'kindergarten / preschool', cafe:'café', supermarket:'supermarket', bar:'craft beer bar'};
 
-/* Personal reference points — pinned to the top of "A specific place".
-   Coordinates from OpenStreetMap for the named landmarks. */
-var CUSTOM = [
-  {n:"Aldinga Reserve", note:'Aldinga Reserve, Stoke',                    lat:-41.3113062, lon:173.2236205},
-  {n:"Brightwater church", note:"St Paul's Anglican church, Brightwater",    lat:-41.3703624, lon:173.1038358},
-  {n:'Nelson weekend market', note:'Montgomery Square',                  lat:-41.2733000, lon:173.2828000},
-  {n:'The Free House', note:'craft beer bar',                            lat:-41.2733148, lon:173.2874619}
-];
-
-/* Craft beer bars around Nelson, for "Nearest craft beer bar" (OpenStreetMap). */
-var BARS = [
-  {n:'The Free House',              lat:-41.2733148, lon:173.2874619},
-  {n:'Craft Beer Depot',            lat:-41.2713414, lon:173.2820581},
-  {n:'Two Thumbs Brewery',          lat:-41.2719025, lon:173.2865607},
-  {n:'Sprig + Fern Brewing Co.',    lat:-41.2744790, lon:173.2864905},
-  {n:'Eddyline Brewery, Richmond',  lat:-41.3324782, lon:173.2011256},
-  {n:'Sprig & Fern, Brightwater',   lat:-41.3763457, lon:173.1098989},
-  {n:'Sprig & Fern, Wakefield',     lat:-41.2529708, lon:173.0949969}
-];
+var CUSTOM = RC.custom, BARS = RC.bars;
 
 var refSel = document.getElementById('ref');
 var groups = [['Nearest of a kind', [
   ['type:primary','Nearest primary school'],
   ['type:cafe','Nearest café'],
   ['type:supermarket','Nearest supermarket'],
-  ['type:bar','Nearest craft beer bar'],
+].concat(BARS.length ? [['type:bar','Nearest craft beer bar']] : []).concat([
   ['type:intermediate','Nearest intermediate school'],
   ['type:secondary','Nearest secondary school']
-]]];
-var named = POIS.filter(function(p){ return p.t!=='kindergarten'; }).sort(function(a,b){
+])]];
+var named = POIS.filter(function(p){ return p.t!=='kindergarten' && (RC.cafesInPlaces || p.t!=='cafe'); }).sort(function(a,b){
   if(a.t!==b.t) return a.t.localeCompare(b.t);
   return a.n.localeCompare(b.n);
 });
@@ -553,8 +663,11 @@ function refFor(p){
 /* ---------- map ---------- */
 var VB={w:460,h:560,pad:16};
 var lats=P.map(function(p){return p.lat}), lons=P.map(function(p){return p.lon});
-var b={n:Math.max.apply(null,lats)+.012, s:Math.min.apply(null,lats)-.012,
-       e:Math.max.apply(null,lons)+.012, w:Math.min.apply(null,lons)-.012};
+var b = P.length ? {n:Math.max.apply(null,lats)+.012, s:Math.min.apply(null,lats)-.012,
+                    e:Math.max.apply(null,lons)+.012, w:Math.min.apply(null,lons)-.012}
+                 : RC.bounds;
+/* Wellington always shows its whole corridor, however the listings are spread */
+if(RC.wholeFrame) b={n:Math.max(b.n,RC.bounds.n), s:Math.min(b.s,RC.bounds.s), e:Math.max(b.e,RC.bounds.e), w:Math.min(b.w,RC.bounds.w)};
 var kx=Math.cos((b.n+b.s)/2*Math.PI/180);
 var spanX=(b.e-b.w)*kx, spanY=(b.n-b.s);
 var scale=Math.min((VB.w-2*VB.pad)/spanX,(VB.h-2*VB.pad)/spanY);
@@ -583,25 +696,30 @@ function el(n,a){ var e=document.createElementNS(NS,n); for(var k in a) e.setAtt
 
 function drawBase(){
   var g=el('g',{});
-  GEO.road.forEach(function(s){ g.appendChild(el('path',{d:pathOf(decode(s)),fill:'none',stroke:'var(--road)','stroke-width':1.6,'stroke-linecap':'round'})); });
-  GEO.river.forEach(function(s){ g.appendChild(el('path',{d:pathOf(decode(s)),fill:'none',stroke:'var(--water)','stroke-width':1.4,'stroke-linecap':'round'})); });
-  GEO.coastline.forEach(function(s){ g.appendChild(el('path',{d:pathOf(decode(s)),fill:'none',stroke:'var(--water)','stroke-width':2.6,'stroke-linecap':'round','stroke-linejoin':'round'})); });
+  GEO.road.forEach(function(s){ g.appendChild(el('path',{d:pathOf(decode(s)),fill:'none',stroke:'var(--road)','stroke-width':1.6,'stroke-linecap':'round','vector-effect':'non-scaling-stroke'})); });
+  GEO.river.forEach(function(s){ g.appendChild(el('path',{d:pathOf(decode(s)),fill:'none',stroke:'var(--water)','stroke-width':1.4,'stroke-linecap':'round','vector-effect':'non-scaling-stroke'})); });
+  GEO.coastline.forEach(function(s){ g.appendChild(el('path',{d:pathOf(decode(s)),fill:'none',stroke:'var(--water)','stroke-width':2.6,'stroke-linecap':'round','stroke-linejoin':'round','vector-effect':'non-scaling-stroke'})); });
   svg.appendChild(g);
 }
 drawBase();
 
-/* suburb labels, for orientation */
-[['Atawhai',-41.2420,173.3150,'end'],['Marybank',-41.2270,173.3210,'end'],
- ['The Wood',-41.2645,173.2950,'start'],['Nelson CBD',-41.2690,173.2820,'end'],
- ['Maitai',-41.2800,173.3060,'start'],['Washington Valley',-41.2710,173.2670,'end'],
- ['Nelson South',-41.2930,173.2790,'start'],['Tahunanui',-41.2930,173.2440,'middle'],
- ['Wakatu',-41.3010,173.2560,'start'],['Stoke',-41.3220,173.2300,'middle'],
- ['Best Island',-41.3070,173.1640,'start']].forEach(function(L){
+/* suburb labels, for orientation. Minor ones (a min zoom in the 5th slot) appear
+   as you zoom in; sizes are set in applyView so text stays readable at any zoom */
+var labelEls=[];
+RC.labels.forEach(function(L){
   var t=el('text',{x:X(L[2]).toFixed(1),y:Y(L[1]).toFixed(1),fill:'var(--muted)','font-size':9.5,
     'text-anchor':L[3],'font-family':'Archivo Narrow, sans-serif','letter-spacing':'.06em',
-    'style':'text-transform:uppercase;opacity:.85'});
+    'style':'text-transform:uppercase;opacity:.85;pointer-events:none'});
   t.textContent=L[0]; svg.appendChild(t);
+  labelEls.push({el:t, minZoom:L[4]||0});
 });
+function sizeLabels(){
+  var fs=9.5*Math.min(zoomK,1.5)/zoomK;      /* grow a little, then hold on-screen size */
+  labelEls.forEach(function(l){
+    l.el.setAttribute('font-size',fs.toFixed(2));
+    l.el.style.display = zoomK>=l.minZoom ? '' : 'none';
+  });
+}
 
 /* scale bar */
 (function(){
@@ -657,7 +775,7 @@ function updatePlaceMarker(){
 /* ---------- pan / zoom ---------- */
 var zoomK=1;                                    /* on-screen zoom (1 = full extent) */
 var view={x:0,y:0,w:VB.w,h:VB.h};
-var MINW=VB.w*0.28;                             /* deepest zoom-in (~3.5x) */
+var MINW=VB.w*RC.minW;                          /* deepest zoom-in (Nelson ~3.5x, Wellington ~14x) */
 var FULLKM=(b.e-b.w)*111*kx;                     /* geographic width of the default view */
 var suppressClick=false;                        /* set briefly after a drag, so it isn't read as a tap */
 
@@ -674,6 +792,7 @@ function applyView(){
   var across=FULLKM*view.w/VB.w;
   document.getElementById('scalebar').textContent=(across<10?across.toFixed(1):Math.round(across))+' km across';
   paintDots();          /* re-size pins so they stay a constant on-screen size */
+  sizeLabels();
   updatePlaceMarker();
   /* the list follows the map: once the view settles, show only what's inside it */
   if(viewKey()!==listViewKey){ clearTimeout(listTimer); listTimer=setTimeout(render,140); }
@@ -698,6 +817,13 @@ function zoomAt(cx,cy,factor){
 }
 document.getElementById('zin').addEventListener('click',function(){ zoomAt(view.x+view.w/2,view.y+view.h/2,0.7); });
 document.getElementById('zout').addEventListener('click',function(){ zoomAt(view.x+view.w/2,view.y+view.h/2,1/0.7); });
+
+/* double-click / double-tap zooms in on that spot */
+svg.addEventListener('dblclick',function(e){
+  var r=svg.getBoundingClientRect(); if(!r.width) return;
+  e.preventDefault();
+  zoomAt(view.x+(e.clientX-r.left)/r.width*view.w, view.y+(e.clientY-r.top)/r.height*view.h, 0.5);
+});
 
 /* drag to pan — one code path for mouse and touch via Pointer Events */
 var drag=null, panMoved=false;
@@ -763,7 +889,7 @@ function scanText(text){
 }
 function hasFeature(p){ return !!(p.reno||p.dblGlaz); }
 /* a 2130 flood/coastal projection, as opposed to a present-day flood hazard */
-function isFuture(h){ return (h.kind==='flood'||h.kind==='coastal') && /2130/.test(h.scenario||''); }
+function isFuture(h){ return (h.kind==='flood'||h.kind==='coastal') && (h.future || /2130/.test(h.scenario||'')); }
 
 /* ---- ordinal levels for the wind / corrosion / slope / liquefaction filters + chips ---- */
 var WIND_ORD={'Low':0,'Medium':1,'High':2,'Very High':3,'Extra High':4,'Specific Engineering Design':5};
@@ -778,7 +904,7 @@ function windLevel(p){ var v=WIND_ORD[p.windZone]; return v==null?0:v; }
 function corrLevel(p){ var v=CORR_ORD[p.corrosionZone]; return v==null?0:v; }
 function slopeLevel(p){   /* 0 none, 1 Tier 1 (council Tier III, lowest), 2 Tier 2 / run-out, 3 Tier 3 (council Tier I, highest) */
   var m=0; (p.hazards||[]).forEach(function(h){
-    if(h.kind==='slope'){ var lv={slopeI:3,slopeII:2,slopeRunout:2,slopeIII:1}[h.key]||0; if(lv>m)m=lv; } });
+    if(h.kind==='slope'){ var lv={slopeI:3,slopeII:2,slopeRunout:2,slopeIII:1}[h.key]||h.level||0; if(lv>m)m=lv; } });
   return m;
 }
 /* display labels matching the slider's ascending scheme (Tier 3 = highest, council "Tier I") */
@@ -844,27 +970,31 @@ function metricFor(p,mode){
 }
 
 function chipsFor(p){
-  if(p.outsideCoverage) return [['plain','Outside NCC hazard coverage']];
+  if(p.outsideCoverage) return [['plain', REGIONS[regionAt(p.lat,p.lon)].hazards==='ncc' ? 'Outside NCC hazard coverage' : 'No council hazard data']];
   var hz=(p.hazards||[]).filter(function(h){return h.rank>0});
-  if(!hz.length) return [['ok','Nothing flagged']];
+  /* tsunami evacuation zones are shown for information but never scored */
+  var info=(p.hazards||[]).filter(function(h){return h.kind==='tsunami'}).map(function(h){ return ['plain', h.chip||h.name]; });
+  if(!hz.length) return [['ok','Nothing flagged']].concat(info);
   return hz.map(function(h){
     var cls = isFuture(h) ? 'future' : (h.rank>=3?'high':'watch');
+    if(h.chip) return [cls, h.chip+(isFuture(h)?' · sea-level rise':'')];   /* Wellington rows carry their own label */
     var label = h.name==='Liquefaction' ? 'Liquefaction: '+h.detail.replace('Liquefaction Damage is ','').replace(' Liquefaction Vulnerability','')
               : h.kind==='slope' ? slopeScn(h)+' slope'
               : h.name+' '+(h.depth||'');
     return [cls, label.trim()+(isFuture(h)?' · 2130':'')];
-  });
+  }).concat(info);
 }
 
 function detailHTML(p){
   var hz=(p.hazards||[]);
   var rows = hz.length ? hz.map(function(h){
       var cls = isFuture(h) ? 'sev-future' : (h.rank>=3?'sev-high':(h.rank>0?'sev-watch':'sev-ok'));
-      var scn = h.kind==='slope' ? slopeScn(h) : h.scenario;
-      var val = h.kind==='slope' ? slopeScn(h) : h.detail;
+      var nccSlope = h.kind==='slope' && !h.chip;
+      var scn = nccSlope ? slopeScn(h) : h.scenario;
+      var val = nccSlope ? slopeScn(h) : (h.detail===h.scenario ? '' : h.detail);
       return '<li class="'+cls+'"><span class="hzname">'+h.name+'</span><span class="hzscn">'+scn+'</span><span class="hzval">'+val+'</span></li>';
     }).join('')
-    : '<li class="sev-ok"><span class="hzname">'+(p.outsideCoverage?'No council data':'Nothing flagged')+'</span><span class="hzscn">'+(p.outsideCoverage?'Site is outside the Nelson City Council boundary — Tasman District Council publishes this area':'Point falls outside every Nelson City Council hazard polygon queried')+'</span><span class="hzval"></span></li>';
+    : '<li class="sev-ok"><span class="hzname">'+(p.outsideCoverage?'No council data':'Nothing flagged')+'</span><span class="hzscn">'+(p.outsideCoverage?(REGIONS[regionAt(p.lat,p.lon)].hazards==='ncc'?'Site is outside the Nelson City Council boundary — Tasman District Council publishes this area':'The council hazard services could not be reached for this site'):'Point falls outside every council hazard polygon queried')+'</span><span class="hzval"></span></li>';
 
   var kinds=['primary','cafe','supermarket','intermediate','secondary'];
   var near=kinds.map(function(t){
@@ -897,7 +1027,7 @@ function detailHTML(p){
     + '<div class="nearest"><h4>Nearest of each kind</h4><ul>'+near+'</ul></div>'
     + '<div class="acts">'
     + (p.url?'<a href="'+p.url+'" target="_blank" rel="noopener">View listing ↗</a>':'')
-    + '<a href="https://experience.arcgis.com/experience/188c8d0a60d344ccbd80f8aa71c75184/page/River-Flooding" target="_blank" rel="noopener">Council hazard viewer ↗</a>'
+    + (RC.hazards==='ncc'?'<a href="https://experience.arcgis.com/experience/188c8d0a60d344ccbd80f8aa71c75184/page/River-Flooding" target="_blank" rel="noopener">Council hazard viewer ↗</a>':'')
     + '<a href="https://experience.arcgis.com/experience/6e83b0bb19d14a0db411aebdc301cf49/page/Page" target="_blank" rel="noopener">BRANZ zones ↗</a>'
     + (p.userAdded?'<a href="#" class="removeUser" data-id="'+p.id+'" style="color:var(--high)">Remove ✕</a>':'')
     + '<span style="color:var(--muted);font-family:IBM Plex Mono,monospace;font-size:12px">'+p.lat.toFixed(5)+', '+p.lon.toFixed(5)+'</span></div>'
@@ -945,7 +1075,7 @@ function render(){
     if(thumb) li.classList.add('hasimg');
     li.innerHTML='<span class="rank"><input type="checkbox" class="mapchk" '+(hidden[p.id]?'':'checked')+' aria-label="Show this property on the map">'+(i+1)+'</span>'
       +(thumb?'<img class="thumb" src="'+thumb+'" srcset="'+thumb+' 176w, '+p.img+' 504w" sizes="(max-width:640px) 100vw, 88px" alt="" loading="lazy" referrerpolicy="no-referrer">':'')
-      +'<span class="addr">'+p.address.replace(/, Nelson$/,'')+'</span>'
+      +'<span class="addr">'+shortAddr(p)+'</span>'
       +'<span class="metric"><b>'+m[0]+'</b><span>'+m[1]+'</span>'+(m[2]?'<span class="walk">'+m[2]+'</span>':'')+'</span>'
       +'<span class="sub"><b>'+dec(p)+'</b><span>'+(p.priceText||'')+'</span><b>'+(p.beds!=null?p.beds:'—')+'</b><span>bd</span><b>'+(p.land!=null?p.land:'—')+'</b><span>m² land</span></span>'
       +'<span class="chips">'+chips+'</span>'
@@ -997,7 +1127,9 @@ function select(id, scroll){
   var decs=P.map(function(p){return p.decade}).filter(Boolean);
   var med=decs.slice().sort(function(a,b){return a-b})[Math.floor(decs.length/2)];
   var rail=document.getElementById('rail');
-  [[P.length,'listings'],[flood,'in a flood zone'],[clear,'nothing flagged'],[med+'s','median build']].forEach(function(s){
+  var stats = RC.hazards ? [[P.length,'listings'],[flood,'in a flood zone'],[clear,'nothing flagged'],[med+'s','median build']]
+                         : [[P.length,'listings'],[med?med+'s':'—','median build']];
+  stats.forEach(function(s){
     var d=document.createElement('div'); d.className='stat';
     d.innerHTML='<b>'+s[0]+'</b><span>'+s[1]+'</span>'; rail.appendChild(d);
   });
@@ -1111,7 +1243,53 @@ function select(id, scroll){
     else if(kind==='fault'){ detail=scenario; rank=4; }
     return {key:key,name:name,scenario:scenario,kind:kind,detail:detail,depth:depth,rank:rank};
   }
+  /* Wellington: the layer table comes from crawl.py via data.json (hazardRegistry),
+     so it exists once. wgtnHazard() mirrors wgtn_hazard() there. */
+  function layerQuery(url,lon,lat){
+    var g=encodeURIComponent(JSON.stringify({x:lon,y:lat,spatialReference:{wkid:4326}}));
+    return fetch(url+'/query?geometry='+g+'&geometryType=esriGeometryPoint&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=*&returnGeometry=false&f=json')
+      .then(function(r){return r.json();}).then(function(d){return d.error?null:(d.features||[]);}).catch(function(){return null;});
+  }
+  function wgtnHazard(e,a){
+    var h={key:e.key,name:e.name,scenario:e.scenario,kind:e.kind,detail:e.scenario,depth:null,rank:e.rank,chip:e.chip};
+    if(e.future) h.future=true;
+    function str(k){ return String(a[k]==null?'':a[k]).replace(/[<>"&]/g,'').trim(); }
+    if(e.mode==='liq'){
+      var v=str('Liquefaction'); if(!v) return null;
+      h.detail=v+' liquefaction potential'; h.chip='Liquefaction: '+v; h.rank={'Very High':3,'High':3,'Moderate':2}[v]||0;
+    } else if(e.mode==='slope'){
+      var n=parseInt(str('SEVERITY'),10)||0, level={3:1,4:2,5:3}[n]||0;
+      if(n) h.detail='Severity '+n+' of 5';
+      h.level=level; h.chip='Slope failure: '+['low','moderate','moderate to high','high'][level]; h.rank=[0,2,3,3][level];
+    } else if(e.mode==='tsunami'){
+      var c=str('Col_Code').toLowerCase(); if(!c) return null;
+      h.detail=(c.charAt(0).toUpperCase()+c.slice(1)+' zone - '+str('Evac_Zone')).replace(/[ -]+$/,''); h.chip='Tsunami zone: '+c;
+    } else if(e.mode==='kflood'){
+      var z=str('ZONE'), low=z.toLowerCase();
+      h.detail=z||h.detail; h.chip='Flood: '+(low||'hazard area'); h.rank=low.indexOf('corridor')>=0?4:(low.indexOf('overflow')>=0?3:2);
+    } else if(e.field){
+      var f=str(e.field); if(f){ h.detail=f; h.chip=f.replace(/\s+(Rupture Zone|Avoidance Area)$/,'')||e.chip; }
+    }
+    return h;
+  }
+  /* the council isn't known for a typed address, so every council's layers are asked;
+     a point only ever falls inside its own council's polygons */
+  function scanWgtn(lat,lon){
+    var rows=(DATA.hazardRegistry||{}).wellington||[];
+    return Promise.all(rows.map(function(e){ return layerQuery(e.url,lon,lat); })).then(function(res){
+      if(!rows.length || res.every(function(f){return f===null;})) return {outsideCoverage:true,hazards:[]};
+      var hazards=[], done={};
+      rows.forEach(function(e,i){
+        var id=e.council+'/'+e.group, f=res[i];
+        if(!f || !f.length || done[id]) return;
+        var h=wgtnHazard(e,f[0].attributes||{});
+        if(h){ hazards.push(h); done[id]=true; }
+      });
+      return {outsideCoverage:false,hazards:hazards};
+    });
+  }
   function scanHazards(lat,lon){
+    if(REGIONS[regionAt(lat,lon)].hazards==='wgtn') return scanWgtn(lat,lon);
     return arc('Natural_Hazards_Liquefaction',1,lon,lat).then(function(regional){
       if(regional===null) return {outsideCoverage:false,hazards:[]};
       if(regional.length===0) return {outsideCoverage:true,hazards:[]};
@@ -1137,8 +1315,8 @@ function select(id, scroll){
     return {reno:reno,glaz:glaz,evidence:ev.join('; ')};
   }
   function geocode(addr){
-    var base=addr.replace(/\s*,?\s*(nelson|new zealand|nz)\s*$/i,'');
-    return fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(base+', Nelson, New Zealand'))
+    var base=addr.replace(/\s*,?\s*(nelson|wellington|new zealand|nz)\s*$/i,'');
+    return fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(base+', '+RC.label+', New Zealand'))
       .then(function(r){return r.json();}).then(function(a){ return (a&&a[0])?{lat:+a[0].lat,lon:+a[0].lon}:null; }).catch(function(){return null;});
   }
   function numOr(id){ var v=document.getElementById(id).value.trim(); return (v===''||isNaN(+v))?null:+v; }
@@ -1191,7 +1369,7 @@ function select(id, scroll){
       var scored=hits.map(function(x){
         var A=x.attributes.address||{};
         var loc=[A.suburb,A['publish-suburb'],A['suburb-display'],A.district].join(' ').toLowerCase();
-        return {x:x, n:words.filter(function(w){return loc.indexOf(w)>=0;}).length, local:A['region-slug']==='nelson-bays'};
+        return {x:x, n:words.filter(function(w){return loc.indexOf(w)>=0;}).length, local:A['region-slug']===RC.reSlug};
       });
       var pool=scored.filter(function(c){return c.local;});
       if(!pool.length && words.length) pool=scored.filter(function(c){return c.n>0;});
@@ -1314,7 +1492,7 @@ function select(id, scroll){
           if(m) ask=+m[1].replace(/,/g,'');
           var typed=document.getElementById('aDesc').value.trim(), descVal=(typed+' '+(re.desc||'')).trim(), sc=scanDesc(descVal);
           var flagged=hz.hazards.filter(function(h){return h.rank>0;});
-          var p={ id:'user-'+Date.now(), userAdded:true, enrichV:ENRICH_V, reId:re.reId||null, address:address,
+          var p={ id:'user-'+Date.now(), userAdded:true, region:regionAt(coords.lat,coords.lon), enrichV:ENRICH_V, reId:re.reId||null, address:address,
             url:first(link, re.url)||'', img:re.img||null,
             lat:coords.lat, lon:coords.lon,
             beds:first(numOr('aBeds'),re.beds,h.beds), baths:first(numOr('aBaths'),re.baths,h.baths), parking:first(re.parking),
@@ -1326,6 +1504,7 @@ function select(id, scroll){
             lastSale:first(h.lastSale), lastSaleDate:first(h.lastSaleDate),
             reno:sc.reno, dblGlaz:sc.glaz, featEvidence:clean(sc.evidence), descScanned:!!descVal, windZone:null, corrosionZone:null };
           p.sev=severity(p);
+          if(p.region!==REGION){ USER_ELSEWHERE.push(p); saveUserProps(); switchRegion(p.region); return; }   /* it belongs on the other map */
           P.push(p); makeDot(p); saveUserProps();
           ['aAddr','aUrl','aBeds','aBaths','aFloor','aLand','aPrice','aDesc'].forEach(function(id){ document.getElementById(id).value=''; });
           submit.disabled=false; toggle(false); setStatus('');
