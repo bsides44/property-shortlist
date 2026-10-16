@@ -1152,13 +1152,20 @@ function select(id, scroll){
     var s=document.getElementById(id); s.min=min; s.max=max; s.step=step; s.value=def; return s;
   }
   setup('fBuilt', dR.min,  dR.max, 10,   dR.min);   /* default = oldest -> no lower bound */
-  setup('fPrice', pR.min,  pR.max, 5000, pR.max);   /* default = dearest -> no upper bound */
-  setup('fLand',  lR.min,  lR.max, 10,   lR.min);
-  setup('fFloor', flR.min, flR.max, 5,   flR.min);
-  setup('fBeds',  bR.min,  bR.max, 1,    bR.min);
+  var pMax=Math.ceil(pR.max/5000)*5000;              /* on the 5000 step grid from 0, so the top is reachable */
+  setup('fPrice', 0,       pMax,   5000, Math.min(750000, pMax));
+  setup('fLand',  0,       lR.max, 10,   Math.min(250, lR.max));
+  setup('fFloor', 0,       flR.max, 5,   Math.min(120, flR.max));
+  setup('fBeds',  1,       bR.max, 1,    Math.min(3, bR.max));
   /* a range slider resting at its open end is "no bound" (null), so a property you
      add from outside the crawled range (smaller floor, dearer) isn't filtered out */
-  F.built=F.price=F.land=F.floor=F.beds=null;
+  F.built=null;
+  /* price, land, floor and beds start filtered (under $750k, 250m² land, 120m² floor, 3+ bed);
+     a slider still reads as null once moved to its open end */
+  F.land  = +document.getElementById('fLand').value===0 ? null : +document.getElementById('fLand').value;
+  F.floor = +document.getElementById('fFloor').value===0 ? null : +document.getElementById('fFloor').value;
+  F.price = +document.getElementById('fPrice').value===pMax ? null : +document.getElementById('fPrice').value;
+  F.beds  = +document.getElementById('fBeds').value===1 ? null : +document.getElementById('fBeds').value;
   /* ordinal risk/zone sliders on the full scale; top position = "Any" (no filter, the default) */
   var slM=SLOPE_LBL.length-1, lqM=LIQ_LBL.length-1, wnM=WIND_LBL.length-1, crM=CORR_LBL.length-1, ftM=FAULT_LBL.length-1;
   setup('fSlopeMax', 0, slM, 1, slM);
