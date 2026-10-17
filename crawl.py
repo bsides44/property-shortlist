@@ -6,7 +6,7 @@ homes.co.nz age/valuation and a double-glazing / renovation description scan, an
 merge the result into data.json.
 
 Designed to run unattended in GitHub Actions (see .github/workflows/update.yml).
-Only *new* listings are enriched each run, capped for politeness; listings that
+Only *new* listings are enriched each run (all of them, requests staggered per host); listings that
 have left the market are dropped. Every outbound third-party request is logged on
 one line (endpoint + status) so a failing run can be diagnosed from CI logs.
 
@@ -27,10 +27,9 @@ DATA = os.path.join(HERE, "data.json")
 
 # ---------------------------------------------------------------- hard filter
 # res_sale + propertyType 1 = residential houses for sale; the same filter
-# applies to every region.
-MIN_BEDS      = 3
+# applies to every region. Bedrooms and land area are deliberately NOT filtered
+# here - every house in the area is kept and the viewer's sliders narrow it down.
 MIN_FLOOR     = 120                       # m^2
-MIN_LAND      = 250                       # m^2
 
 # One entry per map region (the viewer's region toggle). Per region:
 #   districts    realestate.co.nz district id -> the town name appended to addresses
@@ -67,10 +66,10 @@ REGIONS = {
         source_url="https://www.realestate.co.nz/residential/sale/wellington/house",
     ),
 }
-MAX_NEW_PER_RUN = int(os.environ.get("CRAWL_MAX_NEW", "40"))   # enrichments per run
+MAX_NEW_PER_RUN = int(os.environ.get("CRAWL_MAX_NEW", "0"))    # enrichments per run; 0 = no cap (every new house, every day)
 PRUNE_MIN_DISCOVERED = 20                 # only drop "gone" listings if discovery looked healthy
 REQUEST_DELAY = float(os.environ.get("CRAWL_HOMES_DELAY", "1.0"))  # seconds between homes.co.nz requests
-ARC_DELAY     = 0.25                      # seconds between ArcGIS requests
+ARC_DELAY     = 0.25                      # min seconds between any two requests to the same host
 
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/120.0 Safari/537.36")
@@ -85,10 +84,16 @@ SEARCH_API = ("https://platform.realestate.co.nz/search/v1/listings"
 def log(*a):
     print("[crawl]", *a, flush=True)
 
+_last_hit = {}
+
 def fetch(url, tries=3, timeout=30):
     """GET a URL, returning text or None. Logs one line per call at the boundary."""
     host = urllib.parse.urlparse(url).netloc
     for i in range(tries):
+        wait = _last_hit.get(host, 0) + ARC_DELAY - time.monotonic()   # stagger per host
+        if wait > 0:
+            time.sleep(wait)
+        _last_hit[host] = time.monotonic()
         try:
             req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
             with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -566,7 +571,7 @@ def parse_api(item, region, town):
         baths=_int(a.get("bathrooms-total-count")),
         parking=_int(a.get("parking-garage-count")),
         floor=_int(a.get("floor-area")),
-        land=_int(a.get("land-area")),
+        land=(_int(a.get("land-area")) or 0) > 1 and _int(a.get("land-area")) or None,  # 0 / 1 = not given
         priceText=price_txt,
         ask=ask,
         listed=(a.get("published-date") or "")[:10],
@@ -615,9 +620,7 @@ def too_far_north(p):
     return suburb in cfg["exclude_suburbs"] or p["lat"] > cfg["north_limit_lat"]
 
 def qualifies(p):
-    if p["beds"] is None or p["beds"] < MIN_BEDS:   return False
     if p["floor"] is None or p["floor"] < MIN_FLOOR: return False
-    if p["land"] is None or p["land"] < MIN_LAND:   return False
     cfg = REGIONS[p["region"]]
     if km_from(p["lat"], p["lon"], cfg["centre"]) > cfg["radius_km"]: return False
     if too_far_north(p):                            return False
@@ -674,7 +677,7 @@ def save_state(state, props):
                             "hazards": bool(c["hazards"])} for k, c in REGIONS.items()}
     state["hazardRegistry"] = {"wellington": WGTN_LAYERS}
     state["generated"] = time.strftime("%Y-%m-%d")
-    state["criteria"] = {"beds_min": MIN_BEDS, "floor_min": MIN_FLOOR, "land_min": MIN_LAND}
+    state["criteria"] = {"floor_min": MIN_FLOOR}
     tmp = DATA + ".tmp"
     json.dump(state, open(tmp, "w", encoding="utf-8"), ensure_ascii=False)
     os.replace(tmp, DATA)   # atomic; a checkpoint is never a half-written file
@@ -697,17 +700,17 @@ def main():
         else:
             log("%s discovery incomplete or too small (%d) - skipping prune this run"
                 % (cfg["label"], len(qual)))
-        log("discovered %d %s houses, %d meet the filter (%d+ bed, %dm2+ floor, %dm2+ land)"
-            % (len(cands), cfg["label"], len(qual), MIN_BEDS, MIN_FLOOR, MIN_LAND))
+        log("discovered %d %s houses, %d meet the filter (%dm2+ floor)"
+            % (len(cands), cfg["label"], len(qual), MIN_FLOOR))
     disc_set = {p["id"] for p in qualifying}
 
-    # enrich + add new qualifying listings (capped for politeness). We checkpoint
+    # enrich + add every new qualifying listing (requests are staggered). We checkpoint
     # data.json every few adds so an interrupted run keeps its progress and the
     # next run simply resumes with the listings it hasn't reached yet.
     new = [p for p in qualifying if p["id"] not in props]
     added = failed = 0
     for p in new:
-        if added >= MAX_NEW_PER_RUN:
+        if MAX_NEW_PER_RUN and added >= MAX_NEW_PER_RUN:
             log("hit MAX_NEW_PER_RUN =", MAX_NEW_PER_RUN, "- %d remain for next run" % (len(new) - added - failed))
             break
         try:

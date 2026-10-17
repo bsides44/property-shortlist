@@ -203,8 +203,23 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
 .notes a{color:var(--accent)}
 .notes code{font-family:"IBM Plex Mono",monospace;font-size:12px;background:var(--surface-2);padding:1px 4px;border-radius:3px}
 .flag{background:var(--watch-bg);color:var(--watch);border-radius:var(--r);padding:10px 13px;font-size:13px;margin-bottom:18px}
+/* ---------- daily-update loading bar ---------- */
+.upd{background:var(--accent-soft);border-bottom:1px solid var(--line);font-size:13px;color:var(--ink)}
+.upd[hidden]{display:none}
+.upd-in{max-width:1400px;margin:0 auto;padding:8px 16px 10px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px}
+.upd-msg{flex:1 1 260px}
+.upd-msg b{font-weight:600}
+.upd-msg span{color:var(--ink-2)}
+.upd-bar{flex:1 1 100%;order:3;height:5px;border-radius:3px;background:var(--surface);overflow:hidden;position:relative}
+.upd-fill{height:100%;width:0;background:var(--accent);border-radius:3px}
+.upd-bar.busy .upd-fill{background-image:repeating-linear-gradient(-45deg,transparent 0 6px,rgba(255,255,255,.28) 6px 12px);background-size:17px 17px}
+.upd button{font:inherit;font-size:12.5px;border:1px solid var(--accent);background:var(--accent);color:var(--surface);border-radius:var(--r);padding:4px 12px;cursor:pointer}
+.upd button.ghost{background:transparent;color:var(--accent)}
 @media (prefers-reduced-motion:no-preference){
   .dot{transition:r .15s ease, stroke-width .15s ease}
+  .upd-fill{transition:width .6s ease}
+  .upd-bar.busy .upd-fill{animation:updStripe 1s linear infinite}
+  @keyframes updStripe{to{background-position:17px 0}}
 }
 
 /* ---------- mobile ---------- */
@@ -293,6 +308,14 @@ ol.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;ga
     <div class="rail" id="rail"></div>
   </div>
 </header>
+<div class="upd" id="upd" role="status" aria-live="polite" hidden>
+  <div class="upd-in">
+    <div class="upd-msg" id="updMsg"></div>
+    <button type="button" id="updReload" hidden>Reload</button>
+    <button type="button" class="ghost" id="updHide">Hide</button>
+    <div class="upd-bar" id="updBar" role="progressbar" aria-label="Daily update progress" aria-valuemin="0" aria-valuemax="100"><div class="upd-fill" id="updFill"></div></div>
+  </div>
+</div>
 
 <div class="wrap">
   <div class="controls">
@@ -1134,7 +1157,7 @@ function select(id, scroll){
     d.innerHTML='<b>'+s[0]+'</b><span>'+s[1]+'</span>'; rail.appendChild(d);
   });
   var c=DATA.criteria||{};
-  var crit=c.beds_min?(' · '+c.beds_min+'+ bed, '+c.floor_min+'m² floor, '+c.land_min+'m² land'):'';
+  var crit=c.floor_min?(' · '+c.floor_min+'m²+ floor'):'';
   var el=document.getElementById('srcCount');
   if(el) el.textContent=P.length+' houses · updated '+(DATA.generated||'')+crit;
 })();
@@ -1154,13 +1177,13 @@ function select(id, scroll){
   setup('fBuilt', dR.min,  dR.max, 10,   dR.min);   /* default = oldest -> no lower bound */
   var pMax=Math.ceil(pR.max/5000)*5000;              /* on the 5000 step grid from 0, so the top is reachable */
   setup('fPrice', 0,       pMax,   5000, Math.min(750000, pMax));
-  setup('fLand',  0,       lR.max, 10,   Math.min(250, lR.max));
+  setup('fLand',  0,       lR.max, 10,   0);         /* open: no land prefilter */
   setup('fFloor', 0,       flR.max, 5,   Math.min(120, flR.max));
-  setup('fBeds',  1,       bR.max, 1,    Math.min(3, bR.max));
+  setup('fBeds',  1,       bR.max, 1,    1);         /* open: no bedroom prefilter */
   /* a range slider resting at its open end is "no bound" (null), so a property you
      add from outside the crawled range (smaller floor, dearer) isn't filtered out */
   F.built=null;
-  /* price, land, floor and beds start filtered (under $750k, 250m² land, 120m² floor, 3+ bed);
+  /* price and floor start filtered (under $750k, 120m² floor); land and beds start open;
      a slider still reads as null once moved to its open end */
   F.land  = +document.getElementById('fLand').value===0 ? null : +document.getElementById('fLand').value;
   F.floor = +document.getElementById('fFloor').value===0 ? null : +document.getElementById('fFloor').value;
@@ -1558,5 +1581,86 @@ function select(id, scroll){
 document.getElementById('search').addEventListener('input',render);
 render();
 applyView();   /* initialise zoom state + button enabled/disabled */
+})();
+
+/* ---------- daily-update loading bar ----------
+   While the daily GitHub Action is fetching new houses, show its progress; once the
+   rebuilt page is published, offer a reload. Uses the public Actions API without a
+   token (60 requests/hour per visitor), so it checks once on load / when the tab comes
+   back into view, and only polls while a run is actually in progress. */
+(function(){
+  var REPO='bsides44/property-shortlist', API='https://api.github.com/repos/'+REPO+'/actions/';
+  var box=document.getElementById('upd'), msg=document.getElementById('updMsg'),
+      bar=document.getElementById('updBar'), fill=document.getElementById('updFill'),
+      reload=document.getElementById('updReload'), hideBtn=document.getElementById('updHide');
+  var STEP_LBL={'Crawl + enrich (updates data.json)':'finding new houses and checking hazards',
+                'Rebuild viewer (index.html)':'rebuilding the page','Commit if changed':'saving the new houses'};
+  var timer=null, lastCheck=0, dismissed=false, watchedRun=null, finishedAt=null;
+
+  function get(path){
+    return fetch(API+path,{headers:{'Accept':'application/vnd.github+json'}}).then(function(r){
+      if(!r.ok) throw new Error(r.status); return r.json();
+    });
+  }
+  function mins(t){ var m=Math.max(0,Math.round((Date.now()-Date.parse(t))/60000)); return m<1?'just started':m+' min so far'; }
+  function show(html, pct, busy, canReload){
+    if(dismissed) return;
+    box.hidden=false; msg.innerHTML=html;
+    bar.hidden=pct==null; if(pct!=null){ fill.style.width=pct+'%'; bar.setAttribute('aria-valuenow',Math.round(pct)); }
+    bar.classList.toggle('busy',!!busy); reload.hidden=!canReload;
+  }
+  function hide(){ box.hidden=true; }
+  function poll(ms){ clearTimeout(timer); timer=setTimeout(check,ms); }
+
+  function check(){
+    lastCheck=Date.now();
+    if(finishedAt) return checkPublished();
+    get('workflows/update.yml/runs?per_page=1').then(function(d){
+      var run=d.workflow_runs&&d.workflow_runs[0];
+      if(!run) return hide();
+      if(run.status!=='completed'){
+        watchedRun=run;
+        if(run.status!=='in_progress'){ show('<b>Loading new houses</b> <span>&middot; waiting to start</span>',3,true); return poll(30000); }
+        return get('runs/'+run.id+'/jobs').then(function(j){
+          var steps=(j.jobs&&j.jobs[0]&&j.jobs[0].steps)||[];
+          var done=steps.filter(function(s){return s.status==='completed'}).length;
+          var cur=steps.filter(function(s){return s.status==='in_progress'})[0];
+          var pct=steps.length?Math.max(3,100*done/steps.length):3;
+          var what=cur?(STEP_LBL[cur.name]||'getting ready'):'getting ready';
+          show('<b>Loading new houses</b> <span>&middot; '+what+' &middot; '+mins(run.run_started_at||run.created_at)+'</span>',pct,true);
+          poll(45000);
+        });
+      }
+      if(watchedRun && run.id===watchedRun.id){       /* the run we watched just finished */
+        if(run.conclusion!=='success'){ show('<b>Today’s update didn’t finish</b> <span>&middot; it will try again tomorrow</span>',null,false); return; }
+        finishedAt=run.updated_at; watchedRun=null; return checkPublished();
+      }
+      hide();
+    }).catch(function(){ hide(); });            /* offline / rate-limited: stay quiet */
+  }
+  /* after the crawl commits, GitHub Pages republishes the site (~1 min) */
+  function checkPublished(){
+    get('runs?per_page=5').then(function(d){
+      var pg=(d.workflow_runs||[]).filter(function(r){
+        return r.name==='pages-build-deployment' && Date.parse(r.created_at)>=Date.parse(finishedAt)-60000;
+      })[0];
+      if(pg && pg.status==='completed'){
+        finishedAt=null;
+        show('<b>New houses are ready</b> <span>&middot; reload to see them</span>',100,false,true); return;
+      }
+      if(!pg && Date.now()-Date.parse(finishedAt)>4*60000){   /* nothing changed, so nothing to publish */
+        finishedAt=null; show('<b>Up to date</b> <span>&middot; no new houses today</span>',100,false); return;
+      }
+      show('<b>Loading new houses</b> <span>&middot; publishing the updated page</span>',96,true);
+      poll(20000);
+    }).catch(function(){ hide(); });
+  }
+
+  reload.addEventListener('click',function(){ location.reload(); });
+  hideBtn.addEventListener('click',function(){ dismissed=true; hide(); });
+  document.addEventListener('visibilitychange',function(){
+    if(!document.hidden && Date.now()-lastCheck>5*60000) check();
+  });
+  check();
 })();
 </script>

@@ -21,9 +21,7 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    env:
-      CRAWL_MAX_NEW: "40"     # new listings enriched per run (politeness cap)
+    timeout-minutes: 120      # no per-run cap, so a busy day can take a while
     steps:
       - uses: actions/checkout@v4
 

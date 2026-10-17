@@ -5,8 +5,8 @@ every listing: where is it, is it in a hazard zone (flood / slope / liquefaction
 how old / renovated is it, and how far is it from the things you care about.
 
 It tracks realestate.co.nz on its own. A daily [GitHub Action](.github/workflows/update.yml)
-crawls the current Nelson listings that meet a hard filter (3+ bed, 120 m²+ floor,
-250 m²+ land), enriches each with council hazard data, homes.co.nz age/valuation and a
+crawls the current Nelson listings that meet a hard filter (120 m²+ floor; bedrooms and
+land area are not filtered at crawl time — use the sliders), enriches each with council hazard data, homes.co.nz age/valuation and a
 double-glazing / renovation scan of the listing text, rebuilds the page and commits it.
 New qualifying houses appear automatically; sold ones drop off.
 
@@ -57,10 +57,11 @@ python3 build_html.py      # rebuild nelson_shortlist.html + index.html
 
 - **Free tier.** One ~5–15 min job a day. Public repos: Actions minutes are unmetered.
   Private repos: 2,000 min/month free, so this uses roughly a quarter of it at most.
-- **Politeness.** Discovery is 2–3 API calls. Only *new* listings are enriched, capped at
-  `CRAWL_MAX_NEW` (40) per run — so a first run backfills 40 and the rest arrive over the
-  next few days, then it's just whatever came on the market. Hazard queries run against
-  the public council Esri service; homes.co.nz calls are spaced out.
+- **Politeness.** Discovery is a handful of API calls. Every *new* listing is enriched each
+  run (no cap; set `CRAWL_MAX_NEW` to impose one), and requests are staggered: at least
+  0.25 s between calls to the same host, 1 s between homes.co.nz and discovery pages.
+  While a run is in progress the page shows a loading bar (it polls the public
+  GitHub Actions API) and offers a reload once the new houses are published.
 - **First run.** `data.json` was seeded locally with the full backfill, so day one is
   already complete; the Action just maintains it.
 
@@ -72,7 +73,7 @@ rather not host it, just `git pull` and open `nelson_shortlist.html` locally.
 
 ### Tuning
 
-The filter and cadence live at the top of `crawl.py` (`MIN_BEDS`, `MIN_FLOOR`, `MIN_LAND`,
+The filter and cadence live at the top of `crawl.py` (`MIN_FLOOR`,
 `MAX_NEW_PER_RUN`) and in the workflow's `cron`; each region's districts, centre / radius and
 northern cut-off live in `REGIONS`.
 
@@ -127,8 +128,8 @@ GET https://platform.realestate.co.nz/search/v1/listings
 Each `data[]` item's `attributes` already carry everything we filter and display —
 `bedroom-count`, `floor-area`, `land-area`, `price-display`, `published-date`,
 `description`, `photos` (the first one becomes the row thumbnail) and
-`address.latitude/longitude`. The hard filter (3+ bed, 120 m²+ floor,
-250 m²+ land) is applied in `crawl.py`; the coordinates feed the hazard queries directly,
+`address.latitude/longitude`. The hard filter (120 m²+ floor;
+no bedroom or land prefilter) is applied in `crawl.py`; the coordinates feed the hazard queries directly,
 so homes.co.nz's fuzzy address search never has to guess which house we mean.
 
 Notes for anyone extending it:
