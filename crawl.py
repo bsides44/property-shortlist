@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Discover houses for sale on realestate.co.nz that meet a hard filter, in each
+"""Discover every house for sale on realestate.co.nz in each
 map region (see REGIONS: Nelson, and Wellington up to Paraparaumu), enrich each
 with council hazard data where the region has it (Nelson City Council so far),
 homes.co.nz age/valuation and a double-glazing / renovation description scan, and
@@ -25,11 +25,10 @@ from concurrent.futures import ThreadPoolExecutor
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "data.json")
 
-# ---------------------------------------------------------------- hard filter
-# res_sale + propertyType 1 = residential houses for sale; the same filter
-# applies to every region. Bedrooms and land area are deliberately NOT filtered
-# here - every house in the area is kept and the viewer's sliders narrow it down.
-MIN_FLOOR     = 120                       # m^2
+# ---------------------------------------------------------------- filter
+# res_sale + propertyType 1 = residential houses for sale. Bedrooms, floor and land
+# area are deliberately NOT filtered here - every house in the area is kept (only the
+# region's radius / northern cut-off apply) and the viewer's sliders narrow it down.
 
 # One entry per map region (the viewer's region toggle). Per region:
 #   districts    realestate.co.nz district id -> the town name appended to addresses
@@ -570,7 +569,7 @@ def parse_api(item, region, town):
         beds=_int(a.get("bedroom-count")),
         baths=_int(a.get("bathrooms-total-count")),
         parking=_int(a.get("parking-garage-count")),
-        floor=_int(a.get("floor-area")),
+        floor=(_int(a.get("floor-area")) or 0) > 1 and _int(a.get("floor-area")) or None,  # 0 / 1 = not given
         land=(_int(a.get("land-area")) or 0) > 1 and _int(a.get("land-area")) or None,  # 0 / 1 = not given
         priceText=price_txt,
         ask=ask,
@@ -620,7 +619,6 @@ def too_far_north(p):
     return suburb in cfg["exclude_suburbs"] or p["lat"] > cfg["north_limit_lat"]
 
 def qualifies(p):
-    if p["floor"] is None or p["floor"] < MIN_FLOOR: return False
     cfg = REGIONS[p["region"]]
     if km_from(p["lat"], p["lon"], cfg["centre"]) > cfg["radius_km"]: return False
     if too_far_north(p):                            return False
@@ -677,7 +675,7 @@ def save_state(state, props):
                             "hazards": bool(c["hazards"])} for k, c in REGIONS.items()}
     state["hazardRegistry"] = {"wellington": WGTN_LAYERS}
     state["generated"] = time.strftime("%Y-%m-%d")
-    state["criteria"] = {"floor_min": MIN_FLOOR}
+    state["criteria"] = {}
     tmp = DATA + ".tmp"
     json.dump(state, open(tmp, "w", encoding="utf-8"), ensure_ascii=False)
     os.replace(tmp, DATA)   # atomic; a checkpoint is never a half-written file
@@ -700,8 +698,7 @@ def main():
         else:
             log("%s discovery incomplete or too small (%d) - skipping prune this run"
                 % (cfg["label"], len(qual)))
-        log("discovered %d %s houses, %d meet the filter (%dm2+ floor)"
-            % (len(cands), cfg["label"], len(qual), MIN_FLOOR))
+        log("discovered %d %s houses, %d inside the area" % (len(cands), cfg["label"], len(qual)))
     disc_set = {p["id"] for p in qualifying}
 
     # enrich + add every new qualifying listing (requests are staggered). We checkpoint

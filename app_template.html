@@ -1156,10 +1156,8 @@ function select(id, scroll){
     var d=document.createElement('div'); d.className='stat';
     d.innerHTML='<b>'+s[0]+'</b><span>'+s[1]+'</span>'; rail.appendChild(d);
   });
-  var c=DATA.criteria||{};
-  var crit=c.floor_min?(' · '+c.floor_min+'m²+ floor'):'';
   var el=document.getElementById('srcCount');
-  if(el) el.textContent=P.length+' houses · updated '+(DATA.generated||'')+crit;
+  if(el) el.textContent=P.length+' houses · updated '+(DATA.generated||'');
 })();
 
 /* ---------- more filters ---------- */
@@ -1178,12 +1176,12 @@ function select(id, scroll){
   var pMax=Math.ceil(pR.max/5000)*5000;              /* on the 5000 step grid from 0, so the top is reachable */
   setup('fPrice', 0,       pMax,   5000, Math.min(750000, pMax));
   setup('fLand',  0,       lR.max, 10,   0);         /* open: no land prefilter */
-  setup('fFloor', 0,       flR.max, 5,   Math.min(120, flR.max));
+  setup('fFloor', 0,       flR.max, 5,   0);         /* open: no floor prefilter */
   setup('fBeds',  1,       bR.max, 1,    1);         /* open: no bedroom prefilter */
   /* a range slider resting at its open end is "no bound" (null), so a property you
      add from outside the crawled range (smaller floor, dearer) isn't filtered out */
   F.built=null;
-  /* price and floor start filtered (under $750k, 120m² floor); land and beds start open;
+  /* price starts filtered (under $750k); land, floor and beds start open;
      a slider still reads as null once moved to its open end */
   F.land  = +document.getElementById('fLand').value===0 ? null : +document.getElementById('fLand').value;
   F.floor = +document.getElementById('fFloor').value===0 ? null : +document.getElementById('fFloor').value;

@@ -5,14 +5,14 @@ every listing: where is it, is it in a hazard zone (flood / slope / liquefaction
 how old / renovated is it, and how far is it from the things you care about.
 
 It tracks realestate.co.nz on its own. A daily [GitHub Action](.github/workflows/update.yml)
-crawls the current Nelson listings that meet a hard filter (120 m²+ floor; bedrooms and
-land area are not filtered at crawl time — use the sliders), enriches each with council hazard data, homes.co.nz age/valuation and a
+crawls every current Nelson house listing (bedrooms, floor and land area are not filtered
+at crawl time — use the sliders), enriches each with council hazard data, homes.co.nz age/valuation and a
 double-glazing / renovation scan of the listing text, rebuilds the page and commits it.
 New qualifying houses appear automatically; sold ones drop off.
 
 **Two regions, one page.** A Nelson / Wellington switch under the title swaps the
 listings, map and nearby places. Wellington covers Wellington City, Porirua and the Kāpiti
-Coast as far as Paraparaumu (no Hutt Valley), with the same hard filter. Its hazards come
+Coast as far as Paraparaumu (no Hutt Valley), with no size filter either. Its hazards come
 from Greater Wellington plus the three councils' district plans. See [Regions](#regions).
 
 Open `nelson_shortlist.html` (or the GitHub Pages `index.html`) in any browser. It is
@@ -73,8 +73,7 @@ rather not host it, just `git pull` and open `nelson_shortlist.html` locally.
 
 ### Tuning
 
-The filter and cadence live at the top of `crawl.py` (`MIN_FLOOR`,
-`MAX_NEW_PER_RUN`) and in the workflow's `cron`; each region's districts, centre / radius and
+The cadence lives at the top of `crawl.py` (`MAX_NEW_PER_RUN`) and in the workflow's `cron`; each region's districts, centre / radius and
 northern cut-off live in `REGIONS`.
 
 **Northern cut-off (Nelson).** Marybank and everything beyond it is left out: `exclude_suburbs`
@@ -128,8 +127,8 @@ GET https://platform.realestate.co.nz/search/v1/listings
 Each `data[]` item's `attributes` already carry everything we filter and display —
 `bedroom-count`, `floor-area`, `land-area`, `price-display`, `published-date`,
 `description`, `photos` (the first one becomes the row thumbnail) and
-`address.latitude/longitude`. The hard filter (120 m²+ floor;
-no bedroom or land prefilter) is applied in `crawl.py`; the coordinates feed the hazard queries directly,
+`address.latitude/longitude`. No size filter is applied in `crawl.py`
+(only each region's area limits); the coordinates feed the hazard queries directly,
 so homes.co.nz's fuzzy address search never has to guess which house we mean.
 
 Notes for anyone extending it:
